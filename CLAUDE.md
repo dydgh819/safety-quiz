@@ -4,10 +4,13 @@
 
 - 요구사항 원문: `docs/PRD.md` (요구사항 ID: SH, QZ, RS, JN, PL, MB, RP)
 - 단계별 계획·진행 상황: `docs/PLAN.md`
+- **PRD와 다른 결정은 `docs/PLAN.md`의 "결정 사항"(D-01 …)에 있으며, PRD보다 우선한다.**
 - 작업 전 해당 단계의 PRD 요구사항과 PLAN.md 체크리스트를 먼저 읽는다.
 
 ## 1차 범위
 
+- **현재 목표는 테스트 버전**: 교육자 로그인 → Show 작성 → 닉네임 입장 → 실시간 진행 → 리포트·엑셀 흐름이 끝까지 동작하는 것. 인증·본인 확인 세부 기능(허용 도메인, 대상자 명단·대조, 요청 제한 등)은 추후 구현(PLAN.md D-09).
+- **피교육자는 사번 대신 닉네임을 자유 입력**한다(형식 검증 없음, 회차 안에서 중복 불가, 기기 교체 없음). 사번 컬럼은 추후 인증용으로 nullable로만 남긴다(D-03, D-07).
 - **문제 유형: 선택형만** (`questions.type = 'choice'`)
 - **진행 모드: 개인전만** (`sessions.mode = 'choice_individual'`), 진행 방식은 현장 Play / 원격 Play
 - 범위 밖(만들지 않음): OX·단답·순서·초성·토론·설문·영상·Word Cloud·설명 유형, 팀전, 골든벨, Mission, 카테고리·태그, 공개 공유, 구글 클래스룸, 유튜브·오디오 첨부, AI 문제 생성, 벤치마킹 서비스의 캐릭터·일러스트·음원
@@ -49,7 +52,9 @@
    - 새 테이블을 만드는 마이그레이션에는 반드시 `enable row level security`와 정책을 함께 넣는다.
    - 교육자는 자기 소유 Show·문제·명단·회차와 그 하위 참가자·답안만 읽고 쓴다. `anon`은 아무 테이블에도 접근하지 못한다.
 
-그 밖의 보안 규칙(PRD 6.1): 재접속 토큰은 해시로만 저장, PIN 조회·입장 API에 요청 제한, 교육자 가입은 `ALLOWED_EMAIL_DOMAIN` 도메인만(클라이언트 검사만으로 끝내지 말고 서버/DB 쪽에서도 막는다), 개인정보는 사번·이름·부서로 최소 수집.
+6. **실시간 방송은 신호로만 쓴다.** Supabase 공개 채널은 누구나 메시지를 보낼 수 있으므로, 방송을 받으면 상태·정답·순위는 API로 다시 받아 화면을 맞춘다(D-19).
+
+그 밖의 보안 규칙(PRD 6.1): 재접속 토큰은 해시로만 저장, 개인정보는 닉네임·입장 시각으로 최소 수집. 요청 제한과 교육자 가입 도메인 제한(`ALLOWED_EMAIL_DOMAIN`)은 추후 구현이며, 구현할 때는 클라이언트 검사만으로 끝내지 말고 서버/DB 쪽에서 막는다.
 
 ## 폴더 구조
 
@@ -61,12 +66,12 @@ src/
       shows/                   A2 My Show
       shows/[id]/edit/         A4 Show 편집
       shows/[id]/play/         A5 Play 설정
-      rosters/                 A6 대상자 명단
+      rosters/                 A6 대상자 명단(추후)
       reports/                 A7 리포트 목록
       reports/[sessionId]/     A7 리포트 상세
     host/[sessionId]/          P1~P7 발표 화면(로그인 필요, 내비 없음)
     join/                      M1 PIN 입력(공개)
-    play/[pin]/                M2~M8 피교육자 화면(공개)
+    play/[pin]/                M2~M8 피교육자 화면(공개, M2는 닉네임 입력)
     api/                       Route Handlers (route.ts)
   components/
     ui/                        버튼·모달 등 범용 컴포넌트
@@ -108,7 +113,7 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 | 실시간 채널 | `session:{sessionId}` | |
 | API 경로 | 리소스 중심, kebab-case | `/api/sessions/[id]/advance`, `/api/sessions/by-pin/[pin]` |
 
-- 용어는 PRD를 따른다: Show(퀴즈 세트), 회차(session), 참가자(participant), 교육자(host), 사번(`emp_no`), 명단(roster).
+- 용어는 PRD를 따른다: Show(퀴즈 세트), 회차(session), 참가자(participant), 교육자(host), 닉네임(`nickname`), 사번(`emp_no`, 추후), 명단(roster, 추후).
 - DB의 snake_case는 `src/types/db.ts`에서 그대로 쓰고, 화면용으로 바꿀 때만 camelCase 타입을 따로 둔다.
 
 ## 화면 문구
@@ -138,7 +143,7 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 브라우저 공개 가능
 - `SUPABASE_SERVICE_ROLE_KEY` — 서버 전용(절대 규칙 4)
-- `ALLOWED_EMAIL_DOMAIN` — 교육자 가입 허용 도메인
+- `ALLOWED_EMAIL_DOMAIN` — 교육자 가입 허용 도메인(추후 구현, `.env.example`에는 주석으로만)
 
 ## 명령어
 
