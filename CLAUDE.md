@@ -31,7 +31,17 @@
 | 배포 | GitHub → Vercel 자동 배포 |
 
 - 패키지는 해당 단계에 필요한 것만 추가하고, 새 의존성을 넣으면 단계 보고에 이유를 적는다.
-- 설치된 Next.js·Tailwind 버전의 공식 규칙을 따른다(예: 버전에 따라 `middleware.ts`/`proxy.ts`, `tailwind.config` / CSS `@theme` 방식이 다름). 버전 차이로 PRD 지시와 달라지는 부분은 보고에 적는다.
+- 설치된 Next.js·Tailwind 버전의 공식 규칙을 따른다. 버전 차이로 PRD 지시와 달라지는 부분은 보고에 적는다.
+- `@supabase/ssr`는 쓰지 않는다(로그인·쿠키 세션이 없음, D-26). Playwright는 8단계에서 추가한다.
+
+### Next.js 16.4 주의 (학습 데이터와 다름)
+
+- 코드를 쓰기 전에 `node_modules/next/dist/docs/`의 해당 문서를 먼저 확인한다(`AGENTS.md` 참고).
+- **`cacheComponents: true`(기본)**: 데이터는 기본적으로 매 요청 조회된다. DB를 읽는 서버 컴포넌트는 `await connection()` 후 조회하고, 반드시 `<Suspense fallback>` 안에 둔다. 그렇지 않으면 빌드가 실패하거나 빌드 시점에 DB를 호출한다. 캐시가 필요할 때만 `'use cache'` + `cacheLife`.
+- `GET` Route Handler도 같은 프리렌더 규칙을 따른다. 요청마다 달라지는 API는 `request`/`cookies`/`headers`를 쓰거나 `connection()`을 호출한다.
+- `runtime` 라우트 설정(`edge` 등)을 쓰지 않는다(Node.js 런타임만).
+- 라우트 보호 등 요청 전처리 파일은 `middleware.ts`가 아니라 `proxy.ts`다(지금은 로그인이 없어 사용하지 않음).
+- Tailwind v4: `tailwind.config` 없이 `src/app/globals.css`의 `@theme`에 토큰을 둔다(`brand-*`, `choice-1~4`).
 
 ## 절대 규칙 (어기지 말 것)
 
@@ -79,7 +89,9 @@ src/
     editor/                    문제 편집기
     mobile/                    피교육자 화면 컴포넌트
   lib/
+    env.ts                     공개 환경변수 읽기
     supabase/                  client.ts(브라우저 anon, Realtime 구독 전용) · admin.ts(service role, server-only)
+    db/                        서버 전용 DB 조회·저장 함수(server-only, admin 클라이언트 사용)
     quiz/                      문항 검증(validate.ts) 등 문제 관련 순수 로직
     game/                      state-machine.ts · scoring.ts 등 진행 엔진 순수 로직
     realtime/                  채널 이름, 이벤트 타입, 서버 방송 함수
@@ -149,12 +161,11 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 ```bash
 npm run dev        # 개발 서버
 npm run build      # 프로덕션 빌드(타입 검사 포함)
-npm test           # Vitest 단위 테스트
-npm run test:e2e   # Playwright E2E
+npm test           # Vitest 단위 테스트(src/**/*.test.ts)
+npm run typecheck  # tsc --noEmit
 npm run lint       # ESLint
+npm run test:e2e   # Playwright E2E (8단계에서 추가)
 ```
-
-(1단계에서 package.json 스크립트를 위 이름으로 만든다.)
 
 ## 단계 완료 절차
 

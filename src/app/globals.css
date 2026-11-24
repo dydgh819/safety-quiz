@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/*
+ * 디자인 토큰(Tailwind v4 는 tailwind.config 대신 CSS @theme 로 정의, D-23)
+ * - brand: 임시 주황 계열. 회사 CI 확정 시 이 값만 바꾼다.
+ * - choice-1~4: 보기 4색. 항상 도형(▲◆●■)·번호와 함께 쓴다(색각 이상자 고려, MB-02).
+ *   사용 예: bg-brand-500, text-choice-2, bg-choice-3
+ */
+@theme {
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #f97316;
+  --color-brand-600: #ea580c;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+
+  --color-choice-1: #dc2626; /* 1 ▲ 빨강 */
+  --color-choice-2: #2563eb; /* 2 ◆ 파랑 */
+  --color-choice-3: #ca8a04; /* 3 ● 노랑(흰 글자 대비 확보용 진한 톤) */
+  --color-choice-4: #16a34a; /* 4 ■ 초록 */
+
+  --color-background: #ffffff;
+  --color-foreground: #171717;
+
+  --font-sans:
+    "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}

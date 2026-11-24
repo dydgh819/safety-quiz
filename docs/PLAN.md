@@ -11,7 +11,7 @@
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
 | 0 | 프로젝트 규칙과 계획(CLAUDE.md, PLAN.md), PRD 질문·결정 | 완료 |
-| 1 | 셋업·DB(로그인 없음) | 대기 |
+| 1 | 셋업·DB(로그인 없음) | 완료(Supabase 연결 확인 대기) |
 | 2 | Show 목록·편집기 | 대기 |
 | 3 | 엑셀 업로드(대상자 명단은 추후) | 대기 |
 | 4 | Play 설정·대기실·입장 | 대기 |
@@ -89,25 +89,30 @@
 
 **요구사항**: PRD 5.1(테이블), 6.1(RLS, service role) · D-07, D-16, D-26, D-27
 
-- [ ] Next.js(App Router, TS strict, `src/`) + Tailwind 프로젝트 생성
-- [ ] 의존성 설치: `@supabase/supabase-js`, `@supabase/ssr`, `xlsx`(D-22), `qrcode.react`, `zod`, `vitest`, `server-only`
-- [ ] npm 스크립트: `dev`, `build`, `test`, `test:e2e`, `lint`
-- [ ] Supabase 클라이언트 2종: `lib/supabase/client.ts`(브라우저 anon, Realtime 구독 전용), `admin.ts`(service role, `server-only`)
-- [ ] `001_init.sql`: 테이블 7개(shows, questions, rosters, roster_members, sessions, participants, answers — `hosts` 없음, `owner_id`/`host_id` 없음), 유일 제약, 인덱스, `updated_at` 트리거
-  - [ ] `sessions.state` check: lobby/countdown/question/reveal/leaderboard/final/ended
-  - [ ] `questions.type`, `sessions.mode`는 text + check 제약
-  - [ ] PIN은 ended가 아닌 회차 사이에서만 유일(부분 유일 인덱스)
-  - [ ] `participants`: `nickname` not null, (session_id, nickname) 유일, `emp_no`·`dept` nullable(D-07)
-  - [ ] `sessions.show_id`는 `on delete set null`(D-16)
-  - [ ] `sessions.host_key_hash`(진행 키 해시, D-27)
-  - [ ] rosters·roster_members 테이블은 만들어 두되 화면은 추후
-- [ ] `002_rls.sql`: 모든 테이블 RLS 켜기, anon·authenticated 정책 없음(서버 service role만 접근)
-- [ ] DB 접근 계층: 서버 전용 데이터 함수(`src/lib/db/` 등)로 모아 서버 컴포넌트·Server Action·API에서 사용
+- [x] Next.js(App Router, TS strict, `src/`) + Tailwind 프로젝트 생성
+- [x] 의존성 설치: `@supabase/supabase-js`, `qrcode.react`, `zod`, `vitest`, `server-only`
+  - [ ] `xlsx` — **3단계로 미룸**: 공식 CDN(cdn.sheetjs.com)이 개발 환경 네트워크에서 차단됨(D-22). 3단계 시작 전 결정 필요
+  - `@supabase/ssr`는 로그인이 없어 설치하지 않음(D-26)
+- [x] npm 스크립트: `dev`, `build`, `start`, `test`, `test:watch`, `typecheck`, `lint` (`test:e2e`는 Playwright와 함께 8단계)
+- [x] Supabase 클라이언트 2종: `lib/supabase/client.ts`(브라우저 anon, Realtime 구독 전용), `admin.ts`(service role, `server-only`)
+- [x] `001_init.sql`: 테이블 7개(shows, questions, rosters, roster_members, sessions, participants, answers — `hosts` 없음, `owner_id`/`host_id` 없음), 유일 제약, 인덱스, `updated_at` 트리거
+  - [x] `sessions.state` check: lobby/countdown/question/reveal/leaderboard/final/ended
+  - [x] `questions.type`, `sessions.mode`는 text + check 제약
+  - [x] PIN은 ended가 아닌 회차 사이에서만 유일(부분 유일 인덱스)
+  - [x] `participants`: `nickname` not null, (session_id, lower(nickname)) 유일 + (session_id, device_id) 유일, `emp_no`·`dept` nullable(D-07)
+  - [x] `sessions.show_id`는 `on delete set null`(D-16)
+  - [x] `sessions.host_key_hash`(진행 키 해시, D-27)
+  - [x] rosters·roster_members 테이블은 만들어 두되 화면은 추후
+- [x] `002_rls.sql`: 모든 테이블 RLS 켜기, anon·authenticated 정책 없음(서버 service role만 접근)
+- [x] DB 접근 계층: 서버 전용 데이터 함수(`src/lib/db/` 등)로 모아 서버 컴포넌트·Server Action·API에서 사용
 - [ ] ~~로그인·회원가입(A1, SH-01), 라우트 보호~~ (삭제, D-26)
-- [ ] 교육자 공통 레이아웃: 상단 내비(My Show, 리포트)
-- [ ] 색상 토큰: `brand`(임시 주황), 보기 4색
-- [ ] `src/messages/ko.ts` 뼈대, `src/types/db.ts`, `.env.example`
-- [ ] Vitest 설정 + 샘플 테스트 1개
+- [x] 교육자 공통 레이아웃: 상단 내비(My Show, 리포트)
+- [x] 색상 토큰: `brand`(임시 주황), 보기 4색
+- [x] `src/messages/ko.ts` 뼈대, `src/types/db.ts`, `.env.example`
+- [x] Vitest 설정 + 상수 테스트(`src/lib/quiz/constants.test.ts`, DB check 제약과 값 일치 확인)
+- [x] 추가: `/` → `/shows` 리다이렉트, 환경변수 미설정 시 안내 화면, `/reports` 자리 페이지
+
+**검증 결과(2026-11-24)**: `npm run build`·`npm test`(14개)·`npm run lint` 통과. 로컬 Postgres 16에 001·002를 두 번씩 실행해 재실행 안전성, anon·authenticated 접근 거부, 길이·이미지·제한시간 제약, PIN·닉네임·기기·답안 중복 방지, Show 삭제 시 회차 유지를 확인. 실제 Supabase 연결 상태의 화면은 사용자 확인 필요.
 
 **완료 조건**: `npm run build` 통과, 바로 빈 `/shows` 화면 표시, 실행할 SQL 순서 안내.
 
