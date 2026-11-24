@@ -11,7 +11,7 @@
 | 단계 | 내용 | 상태 |
 | --- | --- | --- |
 | 0 | 프로젝트 규칙과 계획(CLAUDE.md, PLAN.md), PRD 질문·결정 | 완료 |
-| 1 | 셋업·DB·인증 | 대기 |
+| 1 | 셋업·DB(로그인 없음) | 대기 |
 | 2 | Show 목록·편집기 | 대기 |
 | 3 | 엑셀 업로드(대상자 명단은 추후) | 대기 |
 | 4 | Play 설정·대기실·입장 | 대기 |
@@ -22,7 +22,7 @@
 
 ## 결정 사항 (0단계, 2026-11-24)
 
-현재 목표는 **테스트 버전**이다. 교육자 로그인 → Show 작성 → 닉네임 입장 → 실시간 진행 → 리포트·엑셀 흐름이 끝까지 동작하는 것을 우선하고, 인증·본인 확인 같은 세부 기능은 추후 구현한다.
+현재 목표는 **테스트 버전**이다. Show 작성 → 닉네임 입장 → 실시간 진행 → 리포트·엑셀 흐름이 끝까지 동작하는 것을 우선하고, 인증·본인 확인 같은 세부 기능은 추후 구현한다.
 
 ### 사용자 답변으로 정한 것
 
@@ -35,8 +35,13 @@
 | D-05 | 옵션 토글은 7개(PRD 6종 + 지각 입장 허용, 기본 On) | 4단계부터 `options` jsonb에 7개 모두 저장 |
 | D-06 | 마지막 문제 뒤에는 문제별 랭킹 없이 최종 랭킹으로 | 상태 전환: 마지막 문제의 reveal → final |
 | D-07 | **사번 대신 닉네임 자유 입력**(형식 검증 없음) | 입장 시 닉네임 하나만 입력(앞뒤 공백 제거, 1~20자). 회차 안에서 닉네임 중복 불가. `participants.nickname` 추가, `emp_no`·`dept`는 nullable로 남겨 추후 사번 인증에 사용. 리포트·엑셀은 닉네임 기준 |
-| D-08 | 교육자 가입은 이메일 인증 없이 | 이메일+비밀번호 가입 즉시 로그인. Supabase에서 'Confirm email' 끄기 |
+| D-08 | ~~교육자 가입은 이메일 인증 없이~~ | D-26으로 대체(로그인 자체를 없앰) |
 | D-09 | 테스트 버전 우선, 인증 등 세부 기능은 추후 | 아래 "추후 구현으로 미룬 것" 참고 |
+
+| D-26 | **교육자 로그인·인증 없음** — 접속자 누구나 교육자 | A1 로그인 화면, SH-01, 라우트 보호, 로그아웃, `hosts` 테이블, `owner_id`/`host_id` 컬럼, Supabase Auth 사용을 모두 삭제. 모든 Show·회차·리포트를 누구나 함께 보고 고칠 수 있음(SH-06은 자연히 충족). 모든 DB 접근은 서버(service role)로만 하고 RLS는 켜 두되 anon 정책은 두지 않음 |
+| D-27 | 진행 키(회차별) | 회차를 만들 때 무작위 진행 키를 발급(DB엔 해시)하고, 상태 전환·강퇴·입장 마감 API는 이 키가 있어야 동작. 발표 화면은 키를 쿠키에 보관. 다른 PC에서 열 때는 리포트의 '발표 화면 다시 열기'로 키를 다시 받음. 목적: 폰에서 회차 id를 알아낸 참가자가 진행을 조작하는 것만 막음 |
+
+**로그인 삭제에 따라 받아들이는 위험(테스트 버전 한정)**: 주소를 아는 누구나 Show를 고치거나 지울 수 있고, 리포트(닉네임·점수)를 볼 수 있으며, 참가자가 마음먹고 교육자 화면(`/shows`)을 열면 정답을 볼 수 있다. 실제 운영 전에 교육자 인증을 다시 넣는다.
 
 ### 제안대로 정한 것
 
@@ -61,11 +66,11 @@
 
 ### 추후 구현으로 미룬 것 (D-09)
 
-- 교육자 가입 허용 도메인 제한(`ALLOWED_EMAIL_DOMAIN`) — SH-01 일부
+- 교육자 로그인·회원가입, 허용 도메인 제한(SH-01, A1) — D-26
 - 대상자 명단(RS-01, RS-02), 명단 대조·수동 승인(JN-05), 미참석자(RP-04) — 닉네임 입장이라 대조할 기준이 없음
 - PIN 조회·입장 API 요청 제한
 - 개인정보 보관 기간 경과 시 자동 삭제, 휴지통 30일 경과 실제 삭제
-- 같은 조직 Show 조회·복사(SH-06), 혼자 풀어보기(SH-05 일부)
+- 혼자 풀어보기(SH-05 일부)
 - 사번 입력·형식 검증(JN-04 원안)
 
 ---
@@ -76,37 +81,35 @@
 - [x] PRD를 `docs/PRD.md`로 올리기
 - [x] 0단계 질문에 답변
 - [ ] Supabase 프로젝트 생성(리전 Seoul), URL·anon key·service_role key 확보
-- [ ] Supabase Authentication 설정에서 'Confirm email' 끄기(D-08)
-- [ ] Vercel에 저장소 연결, 환경변수 3개 등록(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`). `ALLOWED_EMAIL_DOMAIN`은 추후
+- [ ] Vercel에 저장소 연결, 환경변수 3개 등록(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`)
 
 ---
 
-## 1단계. 프로젝트 셋업, DB 스키마, 교육자 로그인
+## 1단계. 프로젝트 셋업, DB 스키마 (로그인 없음)
 
-**요구사항**: SH-01(도메인 제한 제외) · 화면 A1 · PRD 5.1(테이블), 6.1(RLS, service role) · D-07, D-08, D-16
+**요구사항**: PRD 5.1(테이블), 6.1(RLS, service role) · D-07, D-16, D-26, D-27
 
 - [ ] Next.js(App Router, TS strict, `src/`) + Tailwind 프로젝트 생성
 - [ ] 의존성 설치: `@supabase/supabase-js`, `@supabase/ssr`, `xlsx`(D-22), `qrcode.react`, `zod`, `vitest`, `server-only`
 - [ ] npm 스크립트: `dev`, `build`, `test`, `test:e2e`, `lint`
-- [ ] Supabase 클라이언트 3종: `lib/supabase/client.ts`(anon), `server.ts`(쿠키 세션), `admin.ts`(service role, `server-only`)
-- [ ] `001_init.sql`: 테이블 8개(hosts, shows, questions, rosters, roster_members, sessions, participants, answers), 유일 제약, 인덱스, `updated_at` 트리거
+- [ ] Supabase 클라이언트 2종: `lib/supabase/client.ts`(브라우저 anon, Realtime 구독 전용), `admin.ts`(service role, `server-only`)
+- [ ] `001_init.sql`: 테이블 7개(shows, questions, rosters, roster_members, sessions, participants, answers — `hosts` 없음, `owner_id`/`host_id` 없음), 유일 제약, 인덱스, `updated_at` 트리거
   - [ ] `sessions.state` check: lobby/countdown/question/reveal/leaderboard/final/ended
   - [ ] `questions.type`, `sessions.mode`는 text + check 제약
   - [ ] PIN은 ended가 아닌 회차 사이에서만 유일(부분 유일 인덱스)
   - [ ] `participants`: `nickname` not null, (session_id, nickname) 유일, `emp_no`·`dept` nullable(D-07)
   - [ ] `sessions.show_id`는 `on delete set null`(D-16)
+  - [ ] `sessions.host_key_hash`(진행 키 해시, D-27)
   - [ ] rosters·roster_members 테이블은 만들어 두되 화면은 추후
-- [ ] `002_rls.sql`: 모든 테이블 RLS, 교육자는 자기 소유 데이터와 하위 데이터만, anon 접근 불가
-- [ ] `auth.users` 가입 시 `hosts` 행 자동 생성 트리거
-- [ ] 로그인·회원가입(A1): 이메일+비밀번호, 이메일 인증 없음(D-08)
-- [ ] ~~`ALLOWED_EMAIL_DOMAIN` 도메인 제한~~ (추후)
-- [ ] 라우트 보호: `/shows`, `/host`, `/reports` 보호 / `/join`, `/play` 공개
-- [ ] 교육자 공통 레이아웃: 상단 내비(My Show, 리포트, 로그아웃)
+- [ ] `002_rls.sql`: 모든 테이블 RLS 켜기, anon·authenticated 정책 없음(서버 service role만 접근)
+- [ ] DB 접근 계층: 서버 전용 데이터 함수(`src/lib/db/` 등)로 모아 서버 컴포넌트·Server Action·API에서 사용
+- [ ] ~~로그인·회원가입(A1, SH-01), 라우트 보호~~ (삭제, D-26)
+- [ ] 교육자 공통 레이아웃: 상단 내비(My Show, 리포트)
 - [ ] 색상 토큰: `brand`(임시 주황), 보기 4색
 - [ ] `src/messages/ko.ts` 뼈대, `src/types/db.ts`, `.env.example`
 - [ ] Vitest 설정 + 샘플 테스트 1개
 
-**완료 조건**: `npm run build` 통과, 로그인 후 빈 `/shows` 화면 표시, 실행할 SQL 순서 안내.
+**완료 조건**: `npm run build` 통과, 바로 빈 `/shows` 화면 표시, 실행할 SQL 순서 안내.
 
 ## 2단계. Show 목록과 문제 편집기
 
@@ -118,7 +121,7 @@
 - [ ] (P1) SH-04 Show 복사 / 삭제 → 휴지통(`deleted_at`), 복구·완전삭제, 30일 경과 항목 숨김(D-16)
 - [ ] (P1) SH-05 미리보기: 발표 화면 + 폰 화면(현장 블록형) 나란히, 이전/다음
 - [ ] ~~SH-05 혼자 풀어보기~~ (추후)
-- [ ] ~~SH-06 같은 조직 Show 조회·복사~~ (추후)
+- [x] SH-06 같은 조직 Show 조회·복사 — 로그인이 없어 모두 공유되므로 별도 구현 불필요(D-26)
 - [ ] (P0) QZ-01 문제 추가·복사·삭제(2개 이상일 때만 삭제 버튼)·드래그 순서 변경(@dnd-kit)
 - [ ] (P0) QZ-02 단문형(120자, 이미지 가능) / 장문형(300자, 이미지 불가)
 - [ ] (P0) QZ-03 보기 2~4개, 텍스트(60자) 또는 이미지, 정답 체크(복수정답, 최소 1개)
@@ -129,7 +132,7 @@
 - [ ] (P0) QZ-08 자동 저장(1초 디바운스, '저장 중/저장됨'), 미완성 문항 경고
 - [ ] (P0) QZ-08 미완성 판정 `src/lib/quiz/validate.ts` 한 곳 + 단위 테스트
 - [ ] (P0) QZ-09 '완성' 버튼: 미완성 문항으로 이동·안내 / 완성 시 `is_complete=true` + 완성 모달, 수정 시 재계산
-- [ ] 이미지 업로드: Storage `quiz-media`(공개, UUID 파일명), 브라우저에서 1600px·WebP 축소, 5MB 제한, `003_storage.sql`
+- [ ] 이미지 업로드: Storage `quiz-media`(공개, UUID 파일명), 브라우저에서 1600px·WebP 축소, 5MB 제한. 업로드는 서버가 발급한 서명 업로드 URL로(브라우저 anon에 쓰기 권한 없음), `003_storage.sql`
 
 **완료 조건**: Show 생성 → 문제 5개 입력·정렬·완성 가능, `validate.ts` 테스트 통과.
 
@@ -152,7 +155,7 @@
 **요구사항**: PL-01, JN-01 ~ JN-04, JN-06 ~ JN-08, JN-10 · 화면 A5, P1, M1, M2, M3 · PRD 5.3(participant_joined/kicked) · D-03, D-05, D-07, D-10, D-17
 
 - [ ] (P0) PL-01 `/shows/[id]/play`(A5): 교육명(필수), 교육일(기본 오늘), 현장/원격, 옵션 토글 7개(D-05, 기본값 저장만, 동작은 6단계). 재접속 허용은 On 고정·비활성(D-03). 명단 선택은 추후. 완성된 Show만 진입
-- [ ] (P0) JN-01 `POST /api/sessions`: 진행 중 회차와 겹치지 않는 PIN 6자리, `questions_snapshot`, state=lobby. 12시간 방치 회차 자동 종료(D-17)
+- [ ] (P0) JN-01 `POST /api/sessions`: 진행 중 회차와 겹치지 않는 PIN 6자리, `questions_snapshot`, state=lobby, 진행 키 발급 → 발표 화면 쿠키(D-27). 12시간 방치 회차 자동 종료(D-17)
 - [ ] (P0) JN-02 대기실(P1): PIN, URL, 큰 QR, URL 복사, QR PNG 다운로드
 - [ ] 대기실 '입장 마감/재개' 토글(D-10)
 - [ ] (P0) JN-03 `/join`(M1) PIN 입력 → `GET /api/sessions/by-pin/[pin]` / QR은 `/play/[pin]`로 바로
@@ -176,7 +179,7 @@
 
 - [ ] (P0) PL-02 상태 머신 `src/lib/game/state-machine.ts`(순수 함수, 허용 전환 검사, 마지막 문제 reveal → final) + 단위 테스트
 - [ ] (P0) 점수·순위 `src/lib/game/scoring.ts`(PRD 5.4 공식, t ≤ T 제한, 복수정답 완전 일치, 순위 정렬 4단계 — 총 응답시간은 D-13) + 경계값 테스트
-- [ ] (P0) `POST /api/sessions/[id]/advance`: 교육자 전용, 기대 상태 비교로 중복 방지, question 진입 시 서버 `now()`로 `q_started_at`/`q_ends_at`, `state_changed` 방송
+- [ ] (P0) `POST /api/sessions/[id]/advance`: 진행 키 필요(D-27), 기대 상태 비교로 중복 방지, question 진입 시 서버 `now()`로 `q_started_at`/`q_ends_at`, `state_changed` 방송
 - [ ] (P0) PL-03 다음 버튼 + 스페이스바·→·PageDown
 - [ ] (P0) PL-04 문제 화면(P3): 문제, 이미지, 색깔 블록, 남은 시간 막대(서버 시각 보정), 응답 n/N(0.5초 폴링, D-20)
 - [ ] (P0) PL-05 전원 응답 시 조기 마감(접속 중 참가자 기준, D-11), '마감' 버튼
@@ -230,9 +233,9 @@
 
 **요구사항**: PRD 1장 성공 기준, 6.1 보안, 6.2 비기능 요구사항, 8장 현장 시연 체크리스트 · D-01, D-21
 
-- [ ] Playwright E2E: 로그인 → Show(3문항) → Play → 폰 컨텍스트 3개 닉네임 입장 → 전 문항 → 최종 랭킹 → 리포트 엑셀 다운로드 (현장/원격 각각)
+- [ ] Playwright E2E: Show(3문항) → Play → 폰 컨텍스트 3개 닉네임 입장 → 전 문항 → 최종 랭킹 → 리포트 엑셀 다운로드 (현장/원격 각각)
 - [ ] 부하 스크립트 `scripts/load-test.ts`: 가상 참가자 150명 입장·무작위 1~15초 후 제출, 누락 0건, 입장·제출 p95 출력, README에 실행 방법. 무료 플랜 Realtime 한도 확인 결과 기록
-- [ ] 보안 테스트: anon 키로 전 테이블 읽기·쓰기 차단, `question_open`·폰 API에 정답 없음, service role 키가 클라이언트 번들에 없음
+- [ ] 보안 테스트: anon 키로 전 테이블 읽기·쓰기 차단, 진행 키 없이 advance·강퇴 거부, `question_open`·폰 API에 정답 없음, service role 키가 클라이언트 번들에 없음
 - [ ] 모바일 점검: 360px, iOS Safari·삼성 인터넷 에뮬레이션 스크린샷(버튼 크기·글자 잘림)
 - [ ] 성공 기준 확인: 지연 1초 이내, QR → 대기실 30초 이내, 새로고침 후 같은 기기 복귀
 - [ ] README(한국어): 설치, 환경변수, SQL 실행 순서, 배포, 교육 당일 운영 순서(교육자용 1페이지)
@@ -244,9 +247,9 @@
 
 | 영역 | ID | 단계 |
 | --- | --- | --- |
-| Show 관리 | SH-01 | 1 (도메인 제한은 추후) |
+| Show 관리 | SH-01 | 삭제(D-26) |
 | | SH-02 ~ SH-05 | 2 (혼자 풀어보기는 추후) |
-| | SH-06 | 추후 |
+| | SH-06 | 로그인 없음으로 충족(D-26) |
 | 문제 작성 | QZ-01 ~ QZ-09 | 2 |
 | | QZ-10, QZ-11 | 3 |
 | 대상자 명단 | RS-01, RS-02 | 추후 |

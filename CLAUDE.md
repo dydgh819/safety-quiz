@@ -9,7 +9,8 @@
 
 ## 1차 범위
 
-- **현재 목표는 테스트 버전**: 교육자 로그인 → Show 작성 → 닉네임 입장 → 실시간 진행 → 리포트·엑셀 흐름이 끝까지 동작하는 것. 인증·본인 확인 세부 기능(허용 도메인, 대상자 명단·대조, 요청 제한 등)은 추후 구현(PLAN.md D-09).
+- **현재 목표는 테스트 버전**: Show 작성 → 닉네임 입장 → 실시간 진행 → 리포트·엑셀 흐름이 끝까지 동작하는 것. 본인 확인 세부 기능(대상자 명단·대조, 요청 제한 등)은 추후 구현(PLAN.md D-09).
+- **교육자 로그인·인증 없음**: 접속한 누구나 교육자 화면을 쓸 수 있고, 모든 Show·회차·리포트를 함께 본다. 소유자 개념(`owner_id`, `hosts` 테이블)도 두지 않는다(D-26). Supabase Auth를 쓰는 코드를 만들지 않는다.
 - **피교육자는 사번 대신 닉네임을 자유 입력**한다(형식 검증 없음, 회차 안에서 중복 불가, 기기 교체 없음). 사번 컬럼은 추후 인증용으로 nullable로만 남긴다(D-03, D-07).
 - **문제 유형: 선택형만** (`questions.type = 'choice'`)
 - **진행 모드: 개인전만** (`sessions.mode = 'choice_individual'`), 진행 방식은 현장 Play / 원격 Play
@@ -22,7 +23,7 @@
 | --- | --- |
 | 프레임워크 | Next.js App Router + TypeScript (`strict: true`), `src/` 디렉터리 |
 | UI | Tailwind CSS (필요 시 shadcn/ui) |
-| 백엔드 | Supabase — Postgres, Auth(교육자만), Realtime Broadcast/Presence, Storage |
+| 백엔드 | Supabase — Postgres, Realtime Broadcast/Presence, Storage (Auth는 사용 안 함) |
 | 엑셀 | SheetJS (`xlsx`) |
 | QR | `qrcode.react` |
 | 입력 검증 | `zod` (모든 API 입력) |
@@ -37,10 +38,10 @@
 1. **회차 상태·점수는 서버가 기준이며, 서버 시각으로 계산한다.**
    - 상태 전환, `q_started_at`/`q_ends_at`, `elapsed_ms`, 점수, 순위는 모두 서버(API 또는 DB `now()`)에서 계산한다.
    - 클라이언트 시각은 타이머 **표시용 보정**(서버 시각과의 차이)에만 쓴다. 클라이언트가 보낸 시각·점수·정답 여부는 절대 믿지 않는다.
-   - 상태 전환은 교육자 API만 할 수 있고, 허용되지 않은 전환은 서버가 거부한다. `advance` 요청에는 기대 상태를 담아 같은 요청이 두 번 와도 한 번만 반영한다.
+   - 상태 전환은 진행 API(회차 생성 때 발급한 진행 키 필요, D-27)만 할 수 있고, 허용되지 않은 전환은 서버가 거부한다. `advance` 요청에는 기대 상태를 담아 같은 요청이 두 번 와도 한 번만 반영한다.
 2. **피교육자는 DB에 직접 쓰지 않는다. 입장·제출·조회는 Next.js API로만.**
    - 피교육자 API는 서버에서 service role 클라이언트로 처리하고, 재접속 토큰으로 참가자를 확인한다.
-   - 피교육자 브라우저에서 Supabase 테이블을 직접 `select/insert/update` 하는 코드를 만들지 않는다.
+   - 로그인이 없으므로 **교육자 화면도 같다**: 모든 DB 읽기·쓰기는 서버 컴포넌트·Server Action·API 라우트에서 admin 클라이언트로 한다. 브라우저에서 Supabase 테이블을 직접 `select/insert/update` 하는 코드를 만들지 않는다(브라우저의 Supabase 클라이언트는 Realtime 구독에만 쓴다).
 3. **정답은 reveal 전까지 폰에 보내지 않는다.**
    - `is_correct`, 정답 보기 id, 정답 여부를 `question_open` 방송, 상태 API, 답안 제출 응답에 넣지 않는다. 제출 응답은 '접수됨'만.
    - 현장 Play + 답변 노출 Off면 폰용 페이로드에서 보기 텍스트도 뺀다.
@@ -50,26 +51,25 @@
    - `NEXT_PUBLIC_` 접두사를 붙이지 않는다. 클라이언트 컴포넌트(`'use client'`)에서 admin 클라이언트를 import 하지 않는다.
 5. **모든 테이블에 RLS를 켠다.**
    - 새 테이블을 만드는 마이그레이션에는 반드시 `enable row level security`와 정책을 함께 넣는다.
-   - 교육자는 자기 소유 Show·문제·명단·회차와 그 하위 참가자·답안만 읽고 쓴다. `anon`은 아무 테이블에도 접근하지 못한다.
+   - `anon`·`authenticated`용 정책은 만들지 않는다(= 브라우저에서 anon 키로는 아무 테이블도 읽고 쓰지 못함). 접근은 서버의 service role로만 한다.
 
 6. **실시간 방송은 신호로만 쓴다.** Supabase 공개 채널은 누구나 메시지를 보낼 수 있으므로, 방송을 받으면 상태·정답·순위는 API로 다시 받아 화면을 맞춘다(D-19).
 
-그 밖의 보안 규칙(PRD 6.1): 재접속 토큰은 해시로만 저장, 개인정보는 닉네임·입장 시각으로 최소 수집. 요청 제한과 교육자 가입 도메인 제한(`ALLOWED_EMAIL_DOMAIN`)은 추후 구현이며, 구현할 때는 클라이언트 검사만으로 끝내지 말고 서버/DB 쪽에서 막는다.
+그 밖의 보안 규칙(PRD 6.1): 재접속 토큰은 해시로만 저장, 개인정보는 닉네임·입장 시각으로 최소 수집. 요청 제한은 추후 구현이며, 구현할 때는 클라이언트 검사만으로 끝내지 말고 서버 쪽에서 막는다.
 
 ## 폴더 구조
 
 ```
 src/
   app/
-    login/                     A1 교육자 로그인
-    (host)/                    교육자 PC 화면(로그인 필요, 공통 내비)
+    (host)/                    교육자 PC 화면(공개, 공통 내비)
       shows/                   A2 My Show
       shows/[id]/edit/         A4 Show 편집
       shows/[id]/play/         A5 Play 설정
       rosters/                 A6 대상자 명단(추후)
       reports/                 A7 리포트 목록
       reports/[sessionId]/     A7 리포트 상세
-    host/[sessionId]/          P1~P7 발표 화면(로그인 필요, 내비 없음)
+    host/[sessionId]/          P1~P7 발표 화면(진행 키 필요, 내비 없음)
     join/                      M1 PIN 입력(공개)
     play/[pin]/                M2~M8 피교육자 화면(공개, M2는 닉네임 입력)
     api/                       Route Handlers (route.ts)
@@ -79,7 +79,7 @@ src/
     editor/                    문제 편집기
     mobile/                    피교육자 화면 컴포넌트
   lib/
-    supabase/                  client.ts(브라우저 anon) · server.ts(쿠키 세션) · admin.ts(service role, server-only)
+    supabase/                  client.ts(브라우저 anon, Realtime 구독 전용) · admin.ts(service role, server-only)
     quiz/                      문항 검증(validate.ts) 등 문제 관련 순수 로직
     game/                      state-machine.ts · scoring.ts 등 진행 엔진 순수 로직
     realtime/                  채널 이름, 이벤트 타입, 서버 방송 함수
@@ -143,7 +143,6 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 브라우저 공개 가능
 - `SUPABASE_SERVICE_ROLE_KEY` — 서버 전용(절대 규칙 4)
-- `ALLOWED_EMAIL_DOMAIN` — 교육자 가입 허용 도메인(추후 구현, `.env.example`에는 주석으로만)
 
 ## 명령어
 
