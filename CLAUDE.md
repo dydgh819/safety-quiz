@@ -51,7 +51,7 @@
    - 상태 전환은 진행 API(회차 생성 때 발급한 진행 키 필요, D-27)만 할 수 있고, 허용되지 않은 전환은 서버가 거부한다. `advance` 요청에는 기대 상태를 담아 같은 요청이 두 번 와도 한 번만 반영한다.
 2. **피교육자는 DB에 직접 쓰지 않는다. 입장·제출·조회는 Next.js API로만.**
    - 피교육자 API는 서버에서 service role 클라이언트로 처리하고, 재접속 토큰으로 참가자를 확인한다.
-   - 로그인이 없으므로 **교육자 화면도 같다**: 모든 DB 읽기·쓰기는 서버 컴포넌트·Server Action·API 라우트에서 admin 클라이언트로 한다. 브라우저에서 Supabase 테이블을 직접 `select/insert/update` 하는 코드를 만들지 않는다(브라우저의 Supabase 클라이언트는 Realtime 구독에만 쓴다).
+   - 로그인이 없으므로 **교육자 화면도 같다**: 모든 DB 읽기·쓰기는 서버 컴포넌트·Server Action·API 라우트에서 admin 클라이언트로 한다. 브라우저에서 Supabase 테이블을 직접 `select/insert/update` 하는 코드를 만들지 않는다(브라우저의 Supabase 클라이언트는 Realtime 구독과, 서버가 발급한 서명 URL로 이미지를 올리는 데에만 쓴다).
 3. **정답은 reveal 전까지 폰에 보내지 않는다.**
    - `is_correct`, 정답 보기 id, 정답 여부를 `question_open` 방송, 상태 API, 답안 제출 응답에 넣지 않는다. 제출 응답은 '접수됨'만.
    - 현장 Play + 답변 노출 Off면 폰용 페이로드에서 보기 텍스트도 뺀다.
@@ -88,17 +88,19 @@ src/
     ui/                        버튼·모달 등 범용 컴포넌트
     stage/                     발표 화면 컴포넌트(편집 미리보기와 발표 화면이 공유)
     editor/                    문제 편집기
+    shows/                     My Show 목록·기본설정 모달·미리보기
     mobile/                    피교육자 화면 컴포넌트
   lib/
     env.ts                     공개 환경변수 읽기
-    supabase/                  client.ts(브라우저 anon, Realtime 구독 전용) · admin.ts(service role, server-only)
+    supabase/                  client.ts(브라우저 anon: Realtime 구독·서명 URL 업로드 전용) · admin.ts(service role, server-only)
     db/                        서버 전용 DB 조회·저장 함수(server-only, admin 클라이언트 사용)
     quiz/                      문항 검증(validate.ts) 등 문제 관련 순수 로직
     game/                      state-machine.ts · scoring.ts 등 진행 엔진 순수 로직
     realtime/                  채널 이름, 이벤트 타입, 서버 방송 함수
     excel/                     템플릿 생성·업로드 파싱
     report/                    리포트 집계
-    validation/                API 입력 zod 스키마
+    validation/                API·Server Action 입력 zod 스키마
+    storage.ts                 이미지 버킷 상수·URL 검사
   messages/ko.ts               모든 화면 문구
   types/db.ts                  DB 테이블 타입
 supabase/migrations/           001_init.sql, 002_rls.sql …
@@ -110,6 +112,8 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 - 비즈니스 로직(상태 전환, 점수, 순위, 검증, 엑셀 파싱, 리포트 집계)은 `src/lib/`에 **React·Supabase에 의존하지 않는 순수 함수**로 두고 단위 테스트를 붙인다. API 라우트와 컴포넌트는 이 함수를 호출만 한다.
 - 단위 테스트는 대상 파일 옆에 `*.test.ts`, E2E는 `tests/e2e/*.spec.ts`.
 - 페이지는 기본적으로 서버 컴포넌트, 상호작용이 필요한 부분만 `'use client'`로 분리한다.
+- 교육자 화면의 데이터 변경은 Server Action(`src/app/(host)/shows/actions.ts` 등)으로 한다. 결과는 `ActionResult`(`src/lib/action-result.ts`)로 돌려주고, 목록 화면이 바뀌는 작업만 `refresh()`를 부른다. 서버 컴포넌트에서 JSX를 `try` 안에서 만들지 않는다(lint `react-hooks/error-boundaries`).
+- 이미지는 `<img>`를 쓴다(Supabase 공개 URL, 업로드 때 이미 축소됨). `next/image` 최적화는 쓰지 않는다.
 
 ## 네이밍 규칙
 
