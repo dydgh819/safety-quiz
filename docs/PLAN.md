@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 0 | 프로젝트 규칙과 계획(CLAUDE.md, PLAN.md), PRD 질문·결정 | 완료 |
 | 1 | 셋업·DB(로그인 없음) | 완료 |
-| 2 | Show 목록·편집기 | 구현 완료(배포 확인 대기) |
+| 2 | Show 목록·편집기 | 완료 |
 | 3 | 엑셀 업로드(대상자 명단은 추후) | 대기 |
 | 4 | Play 설정·대기실·입장 | 대기 |
 | 5 | 실시간 진행 엔진 | 대기 |
@@ -91,7 +91,7 @@
 
 - [x] Next.js(App Router, TS strict, `src/`) + Tailwind 프로젝트 생성
 - [x] 의존성 설치: `@supabase/supabase-js`, `qrcode.react`, `zod`, `vitest`, `server-only`
-  - [ ] `xlsx` — **3단계로 미룸**: 공식 CDN(cdn.sheetjs.com)이 개발 환경 네트워크에서 차단됨(D-22). 3단계 시작 전 결정 필요
+  - [x] `xlsx` 0.20.3 — 공식 CDN tgz로 설치(2026-11-25). 개발 환경 차단 문제는 저장소 전용 환경 `safety-quiz`를 만들어 cdn.sheetjs.com을 허용해 해결(D-22)
   - `@supabase/ssr`는 로그인이 없어 설치하지 않음(D-26)
 - [x] npm 스크립트: `dev`, `build`, `start`, `test`, `test:watch`, `typecheck`, `lint` (`test:e2e`는 Playwright와 함께 8단계)
 - [x] Supabase 클라이언트 2종: `lib/supabase/client.ts`(브라우저 anon, Realtime 구독 전용), `admin.ts`(service role, `server-only`)
@@ -147,7 +147,7 @@
   - 완전삭제 시 Storage 이미지 파일은 지우지 않음(다른 Show 복사본이 같은 이미지를 쓸 수 있음)
   - 이미지 URL은 우리 버킷 URL만 저장 허용(서버 zod 검사)
 
-**검증 결과(2026-11-25)**: `npm run build`·`npm test`(50개)·`npm run lint`·`npm run typecheck` 통과. 발표 화면 무대·폰 블록·기본 이미지는 빌드된 CSS로 렌더링해 화면 확인. **실제 Supabase 연동 동작(생성·자동 저장·드래그·완성·휴지통·이미지 업로드)은 이 개발 환경에서 로컬 DB를 띄우지 못해 사용자 확인 필요.**
+**검증 결과(2026-11-25)**: `npm run build`·`npm test`(50개)·`npm run lint`·`npm run typecheck` 통과. 발표 화면 무대·폰 블록·기본 이미지는 빌드된 CSS로 렌더링해 화면 확인. 실제 Supabase 연동 동작(생성·자동 저장·드래그·이미지 업로드·완성·휴지통·복사·미리보기)은 사용자가 Preview 배포에서 확인 완료(2026-11-25).
 
 **완료 조건**: Show 생성 → 문제 5개 입력·정렬·완성 가능, `validate.ts` 테스트 통과.
 
