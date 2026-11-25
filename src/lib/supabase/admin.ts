@@ -27,9 +27,21 @@ export class SupabaseNotConfiguredError extends Error {
 
 let cached: AdminClient | null = null;
 
+/**
+ * 비어 있는 Supabase 환경변수의 **이름** 목록(화면 안내용). 값은 절대 돌려주지 않는다.
+ * NEXT_PUBLIC_* 는 빌드 시점에 코드에 박히므로, 변수를 등록하기 전에 빌드된 배포에서는 비어 있다.
+ */
+export function listMissingSupabaseEnv(): string[] {
+  const missing: string[] = [];
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  return missing;
+}
+
 /** 환경변수가 모두 있는지 확인(화면 안내용). */
 export function isSupabaseConfigured(): boolean {
-  return readPublicEnv() !== null && !!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  return listMissingSupabaseEnv().length === 0;
 }
 
 /** 요청 처리 중에만 호출한다. 빌드(프리렌더) 시점에 호출되지 않게 <Suspense> 안이나 API 안에서 쓴다. */

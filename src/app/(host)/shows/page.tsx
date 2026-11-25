@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 
 import { listShows } from "@/lib/db/shows";
-import { isSupabaseConfigured } from "@/lib/supabase/admin";
+import { listMissingSupabaseEnv } from "@/lib/supabase/admin";
 import { ko } from "@/messages/ko";
 
 /** A2 My Show — 1단계는 목록 조회와 빈 상태만. 카드·만들기·메뉴는 2단계. */
@@ -32,8 +32,14 @@ async function ShowList() {
   // DB 조회는 요청 시점에만(빌드 시 프리렌더 제외)
   await connection();
 
-  if (!isSupabaseConfigured()) {
-    return <Notice title={ko.errors.supabaseNotConfigured} hint={ko.errors.supabaseNotConfiguredHint} />;
+  const missingEnv = listMissingSupabaseEnv();
+  if (missingEnv.length > 0) {
+    return (
+      <Notice
+        title={ko.errors.supabaseNotConfigured}
+        hint={ko.errors.supabaseNotConfiguredHint(missingEnv)}
+      />
+    );
   }
 
   let shows;

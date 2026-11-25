@@ -33,8 +33,8 @@ export const ko = {
 
   errors: {
     supabaseNotConfigured: "Supabase 연결 정보가 설정되지 않았습니다.",
-    supabaseNotConfiguredHint:
-      "환경변수 NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY 를 등록한 뒤 다시 배포해 주세요.",
+    supabaseNotConfiguredHint: (missing: readonly string[]) =>
+      `이 배포에 비어 있는 환경변수: ${missing.join(", ")} — Vercel에 등록(Preview 환경 포함)한 뒤 다시 배포(Redeploy)해 주세요.`,
     loadFailed: "데이터를 불러오지 못했습니다.",
     loadFailedHint: "Supabase SQL Editor에서 supabase/migrations 의 SQL 파일을 순서대로 실행했는지 확인해 주세요.",
   },
