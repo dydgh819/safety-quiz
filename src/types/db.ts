@@ -240,7 +240,22 @@ export type Database = {
       >;
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      /** 005_submit_answer.sql: 문제 진행 중일 때만 답안 저장 */
+      submit_answer: {
+        Args: {
+          p_session_id: string;
+          p_participant_id: string;
+          p_question_index: number;
+          p_question_id: string;
+          p_choice_ids: number[];
+          p_is_correct: boolean;
+          p_elapsed_ms: number;
+          p_score: number;
+        };
+        Returns: "accepted" | "duplicate" | "closed" | "not_found";
+      };
+    };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
   };

@@ -11,38 +11,42 @@ import {
   saveCredentials,
 } from "@/lib/client/participant-storage";
 import { fetchPhoneState, joinSession, lookupPin, type ClientErrorCode } from "@/lib/client/play-client";
+import { offsetFrom } from "@/lib/client/use-server-clock";
 import { checkNickname, normalizeNickname } from "@/lib/game/nickname";
 import { NICKNAME_MAX } from "@/lib/quiz/constants";
 import { useSessionSignal } from "@/lib/realtime/use-session-signal";
 import { ko } from "@/messages/ko";
 
+import { GameView, type PhoneState } from "./game-view";
+
 type SessionInfo = { sessionId: string; eduTitle: string };
-type PhoneState = Extract<PhoneStateResponse, { ok: true }>;
+type StateResult = PhoneStateResponse | { ok: false; error: "network" };
 
 type Phase =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "storageBlocked" }
   | { kind: "form"; session: SessionInfo }
-  | { kind: "joined"; session: SessionInfo; state: PhoneState }
+  | { kind: "joined"; session: SessionInfo; state: PhoneState; offset: number }
   | { kind: "kicked" }
   | { kind: "ended" };
 
-/** 폰 대기 화면에서 상태를 다시 확인하는 간격(방송이 안 될 때의 보조) */
-const PHONE_POLL_MS = 10000;
+/** 방송이 안 될 때 상태를 다시 확인하는 간격: 대기실 10초, 퀴즈 진행 중 5초 */
+const LOBBY_POLL_MS = 10000;
+const GAME_POLL_MS = 5000;
 
 function errorMessage(code: ClientErrorCode): string {
   return ko.play.errors[code];
 }
 
-/** 피교육자 화면: PIN 확인 → (저장된 입장 정보로 자동 복귀 | M2 닉네임 입력) → M3 대기 */
+/** 피교육자 화면: PIN 확인 → (저장된 입장 정보로 자동 복귀 | M2 닉네임 입력) → 진행 화면(M3~M8) */
 export function PlayApp({ pin }: { pin: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
 
   /** 상태 API 결과로 화면을 맞춘다. 입장 정보가 무효면 지우고 입력 화면으로 */
-  const applyState = useCallback((session: SessionInfo, result: PhoneStateResponse | { ok: false; error: "network" }) => {
+  const applyState = useCallback((session: SessionInfo, result: StateResult, requestStartedAt: number) => {
     if (result.ok) {
-      setPhase(result.session.state === "ended" ? { kind: "ended" } : { kind: "joined", session, state: result });
+      setPhase({ kind: "joined", session, state: result, offset: offsetFrom(result.serverTime, requestStartedAt) });
       return;
     }
     if (result.error === "kicked") {
@@ -73,14 +77,15 @@ export function PlayApp({ pin }: { pin: string }) {
         setPhase({ kind: "form", session });
         return;
       }
-      // 같은 기기 자동 복귀(JN-07, D-03)
+      // 같은 기기 자동 복귀(JN-07, D-03), 진행 중이면 현재 단계로(PL-10, MB-01)
+      const startedAt = Date.now();
       const state = await fetchPhoneState(session.sessionId, credentials);
       if (cancelled) return;
       if (!state.ok && state.error === "network") {
         setPhase({ kind: "error", message: errorMessage("network") });
         return;
       }
-      applyState(session, state);
+      applyState(session, state, startedAt);
     }
     void boot();
     return () => {
@@ -93,10 +98,28 @@ export function PlayApp({ pin }: { pin: string }) {
     if (!joinedSession) return;
     const credentials = loadCredentials(joinedSession.sessionId);
     if (!credentials) return;
-    applyState(joinedSession, await fetchPhoneState(joinedSession.sessionId, credentials));
+    const startedAt = Date.now();
+    applyState(joinedSession, await fetchPhoneState(joinedSession.sessionId, credentials), startedAt);
   }, [joinedSession, applyState]);
 
-  useSessionSignal(joinedSession?.sessionId ?? null, () => void refresh(), PHONE_POLL_MS);
+  const game = phase.kind === "joined" ? phase.state.game : null;
+  useSessionSignal(
+    joinedSession?.sessionId ?? null,
+    () => void refresh(),
+    !game || game.state === "lobby" || game.state === "ended" ? LOBBY_POLL_MS : GAME_POLL_MS,
+  );
+
+  // 예고·문제 시간이 끝날 즈음 한 번 더 확인(방송이 늦거나 막혀도 다음 단계로 빨리 넘어가게)
+  const stageEnd = game && (game.state === "countdown" || game.state === "question") ? game.qEndsAt : null;
+  const offset = phase.kind === "joined" ? phase.offset : 0;
+  const stageState = game?.state;
+  useEffect(() => {
+    if (!stageEnd) return;
+    const extra = stageState === "countdown" ? 300 : 1200;
+    const delay = new Date(stageEnd).getTime() - (Date.now() + offset) + extra;
+    const timer = setTimeout(() => void refresh(), Math.max(0, delay));
+    return () => clearTimeout(timer);
+  }, [stageEnd, stageState, offset, refresh]);
 
   switch (phase.kind) {
     case "loading":
@@ -115,9 +138,11 @@ export function PlayApp({ pin }: { pin: string }) {
         </Card>
       );
     case "form":
-      return <NicknameForm session={phase.session} onJoined={(state) => applyState(phase.session, state)} />;
+      return <NicknameForm session={phase.session} onJoined={(state, startedAt) => applyState(phase.session, state, startedAt)} />;
     case "joined":
-      return <Waiting state={phase.state} />;
+      return (
+        <GameView sessionId={phase.session.sessionId} data={phase.state} offset={phase.offset} onRefresh={() => void refresh()} />
+      );
     case "kicked":
       return (
         <Card>
@@ -137,7 +162,13 @@ export function PlayApp({ pin }: { pin: string }) {
 }
 
 /** M2 닉네임 입력 + 개인정보 안내(JN-04, JN-10) */
-function NicknameForm({ session, onJoined }: { session: SessionInfo; onJoined: (state: PhoneStateResponse) => void }) {
+function NicknameForm({
+  session,
+  onJoined,
+}: {
+  session: SessionInfo;
+  onJoined: (state: PhoneStateResponse, requestStartedAt: number) => void;
+}) {
   const [nickname, setNickname] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,6 +204,7 @@ function NicknameForm({ session, onJoined }: { session: SessionInfo; onJoined: (
       setBusy(false);
       return;
     }
+    const startedAt = Date.now();
     const state = await fetchPhoneState(session.sessionId, credentials);
     if (!state.ok && state.error === "network") {
       // 입장은 됐지만 상태를 못 받음 → 다시 누르면 같은 기기·닉네임으로 재입장된다
@@ -180,7 +212,7 @@ function NicknameForm({ session, onJoined }: { session: SessionInfo; onJoined: (
       setBusy(false);
       return;
     }
-    onJoined(state);
+    onJoined(state, startedAt);
   }
 
   return (
@@ -216,27 +248,6 @@ function NicknameForm({ session, onJoined }: { session: SessionInfo; onJoined: (
           {busy ? ko.play.entering : ko.play.enter}
         </button>
       </form>
-    </Card>
-  );
-}
-
-/** M3 대기 */
-function Waiting({ state }: { state: PhoneState }) {
-  const started = state.session.state !== "lobby";
-  return (
-    <Card>
-      <p className="text-center text-sm font-semibold break-keep text-neutral-500">{state.session.eduTitle}</p>
-      <div className="flex flex-col items-center gap-2">
-        <span className="flex size-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700" aria-hidden>
-          ✓
-        </span>
-        <p className="text-lg font-bold text-green-700">{ko.play.joined}</p>
-        <p className="text-center text-3xl font-extrabold break-all">{state.me.nickname}</p>
-      </div>
-      <p className="text-center text-neutral-600" aria-live="polite">
-        {ko.play.participantCount(state.session.participantCount)}
-      </p>
-      <p className="text-center font-medium break-keep">{started ? ko.play.inProgress : ko.play.waiting}</p>
     </Card>
   );
 }

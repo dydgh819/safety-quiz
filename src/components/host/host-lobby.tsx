@@ -1,27 +1,19 @@
 "use client";
 
 import { QRCodeCanvas } from "qrcode.react";
-import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 
-import {
-  getLobbyAction,
-  kickParticipantAction,
-  setEntryClosedAction,
-  type LobbySnapshot,
-} from "@/app/host/[sessionId]/actions";
-import { useSessionSignal } from "@/lib/realtime/use-session-signal";
+import { kickParticipantAction, setEntryClosedAction } from "@/app/host/[sessionId]/actions";
+import type { HostView } from "@/lib/game/views";
 import { ko } from "@/messages/ko";
 
 type Props = {
-  sessionId: string;
-  pin: string;
-  eduTitle: string;
-  totalQuestions: number;
-  initial: LobbySnapshot;
+  view: HostView;
+  starting: boolean;
+  onStart: () => void;
+  /** 강퇴·입장 마감 후 화면 데이터 다시 읽기 */
+  onChanged: () => Promise<void>;
 };
-
-/** 대기실 다시 읽기 간격(방송이 안 될 때의 보조) */
-const LOBBY_POLL_MS = 5000;
 
 const noop = () => () => {};
 /** 접속 주소의 기준(현재 사이트 주소). 서버 렌더 때는 빈 문자열 */
@@ -33,44 +25,47 @@ function useOrigin(): string {
   );
 }
 
-/** P1 대기실: PIN·QR·접속 주소, 입장 인원·닉네임(최근 입장 순), 강퇴, 입장 마감 */
-export function HostLobby({ sessionId, pin, eduTitle, totalQuestions, initial }: Props) {
+/** P1 대기실: PIN·QR·접속 주소, 입장 인원·닉네임(최근 입장 순), 강퇴, 입장 마감, 퀴즈 시작 */
+export function HostLobby({ view, starting, onStart, onChanged }: Props) {
   const origin = useOrigin();
-  const [lobby, setLobby] = useState<LobbySnapshot>(initial);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [entryClosed, setEntryClosed] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, startTransition] = useTransition();
   const qrRef = useRef<HTMLCanvasElement>(null);
 
-  const playUrl = origin ? `${origin}/play/${pin}` : "";
+  const playUrl = origin ? `${origin}/play/${view.pin}` : "";
   const joinUrl = origin ? `${origin}/join` : "";
-
-  const reload = useCallback(async () => {
-    const result = await getLobbyAction(sessionId);
-    if (result.ok) setLobby(result.data);
-  }, [sessionId]);
-
-  useSessionSignal(sessionId, () => void reload(), LOBBY_POLL_MS);
+  const participants = view.participants.filter((p) => !hidden.has(p.id));
+  const closed = entryClosed ?? view.entryClosed;
 
   function kick(participantId: string, nickname: string) {
     if (!window.confirm(ko.host.confirmKick(nickname))) return;
     setError(null);
-    // 화면에서 먼저 빼고, 실패하면 다시 읽는다
-    setLobby((l) => ({ ...l, participants: l.participants.filter((p) => p.id !== participantId) }));
+    setHidden((h) => new Set(h).add(participantId)); // 화면에서 먼저 빼고
     startTransition(async () => {
-      const result = await kickParticipantAction(sessionId, participantId);
-      if (!result.ok) setError(result.error);
-      await reload();
+      const result = await kickParticipantAction(view.sessionId, participantId);
+      if (!result.ok) {
+        setError(result.error);
+        setHidden((h) => {
+          const next = new Set(h);
+          next.delete(participantId);
+          return next;
+        });
+      }
+      await onChanged();
     });
   }
 
   function toggleEntry() {
-    const next = !lobby.entryClosed;
-    setLobby((l) => ({ ...l, entryClosed: next }));
+    const next = !closed;
+    setEntryClosed(next);
     startTransition(async () => {
-      const result = await setEntryClosedAction(sessionId, next);
+      const result = await setEntryClosedAction(view.sessionId, next);
       if (!result.ok) setError(result.error);
-      await reload();
+      await onChanged();
+      setEntryClosed(null);
     });
   }
 
@@ -89,35 +84,33 @@ export function HostLobby({ sessionId, pin, eduTitle, totalQuestions, initial }:
     if (!canvas) return;
     const link = document.createElement("a");
     link.href = canvas.toDataURL("image/png");
-    link.download = ko.host.qrFileName(pin);
+    link.download = ko.host.qrFileName(view.pin);
     link.click();
   }
 
-  const count = lobby.participants.length;
-
   return (
     <div className="flex min-h-dvh flex-col bg-gradient-to-br from-brand-50 to-brand-100 text-neutral-900">
-      {/* 상단: 교육명 · 입장 상태 · 시작 */}
       <header className="flex flex-wrap items-center gap-4 px-8 py-4">
-        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold">{eduTitle}</h1>
-        <span className="text-lg font-semibold text-neutral-500">{ko.shows.questionCount(totalQuestions)}</span>
+        <h1 className="min-w-0 flex-1 truncate text-2xl font-bold">{view.eduTitle}</h1>
+        <span className="text-lg font-semibold text-neutral-500">{ko.shows.questionCount(view.total)}</span>
         <button
           type="button"
           onClick={toggleEntry}
           disabled={pending}
           className={`min-h-12 rounded-xl px-5 font-bold ${
-            lobby.entryClosed ? "bg-neutral-700 text-white" : "border-2 border-neutral-400 bg-white text-neutral-700"
+            closed ? "bg-neutral-700 text-white" : "border-2 border-neutral-400 bg-white text-neutral-700"
           }`}
         >
-          {lobby.entryClosed ? `${ko.host.entryClosedBadge} · ${ko.host.reopenEntry}` : ko.host.closeEntry}
+          {closed ? `${ko.host.entryClosedBadge} · ${ko.host.reopenEntry}` : ko.host.closeEntry}
         </button>
         <button
           type="button"
-          disabled
-          title={ko.host.startLater}
-          className="min-h-12 rounded-xl bg-brand-500 px-8 text-lg font-bold text-white opacity-50"
+          onClick={onStart}
+          disabled={starting || view.total === 0}
+          title={ko.host.keyboardHint}
+          className="min-h-12 rounded-xl bg-brand-500 px-8 text-lg font-bold text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          {ko.host.start}
+          {starting ? ko.host.starting : ko.host.start}
         </button>
       </header>
 
@@ -126,32 +119,19 @@ export function HostLobby({ sessionId, pin, eduTitle, totalQuestions, initial }:
           {error}
         </p>
       )}
-      {lobby.state !== "lobby" && (
-        <p className="mx-8 rounded-lg bg-white/80 px-4 py-2 font-semibold">
-          {lobby.state === "ended" ? ko.host.ended : ko.host.inProgress}
-        </p>
-      )}
 
       <main className="grid flex-1 gap-8 px-8 pb-8 lg:grid-cols-[minmax(22rem,36%)_1fr]">
-        {/* 입장 안내 */}
         <section className="flex flex-col items-center gap-5 rounded-3xl bg-white p-8 text-center shadow-sm">
-          <p className="text-lg font-semibold text-neutral-600 break-keep">{ko.host.howToJoin}</p>
+          <p className="text-lg font-semibold break-keep text-neutral-600">{ko.host.howToJoin}</p>
           <div className="w-full max-w-[26rem]">
             {playUrl && (
-              <QRCodeCanvas
-                ref={qrRef}
-                value={playUrl}
-                size={640}
-                marginSize={2}
-                className="h-auto w-full"
-                aria-label={playUrl}
-              />
+              <QRCodeCanvas ref={qrRef} value={playUrl} size={640} marginSize={2} className="h-auto w-full" aria-label={playUrl} />
             )}
           </div>
           <p className="text-3xl font-bold break-all text-brand-700">{joinUrl.replace(/^https?:\/\//, "")}</p>
           <div>
             <p className="text-xl font-semibold text-neutral-500">{ko.host.pinLabel}</p>
-            <p className="text-7xl font-extrabold tracking-[0.15em] tabular-nums">{pin}</p>
+            <p className="text-7xl font-extrabold tracking-[0.15em] tabular-nums">{view.pin}</p>
           </div>
           <div className="flex gap-3">
             <button
@@ -171,19 +151,18 @@ export function HostLobby({ sessionId, pin, eduTitle, totalQuestions, initial }:
           </div>
         </section>
 
-        {/* 입장한 참가자 */}
         <section className="flex min-h-0 flex-col gap-4">
           <div className="flex items-baseline gap-4">
             <p className="text-5xl font-extrabold text-brand-700" aria-live="polite">
-              {ko.host.participants(count)}
+              {ko.host.participants(participants.length)}
             </p>
-            {count > 0 && <p className="text-neutral-500">{ko.host.kickHint}</p>}
+            {participants.length > 0 && <p className="text-neutral-500">{ko.host.kickHint}</p>}
           </div>
-          {count === 0 ? (
+          {participants.length === 0 ? (
             <p className="mt-8 text-center text-2xl text-neutral-500">{ko.host.noParticipants}</p>
           ) : (
             <ul className="flex flex-wrap content-start gap-3">
-              {lobby.participants.map((p) => (
+              {participants.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"

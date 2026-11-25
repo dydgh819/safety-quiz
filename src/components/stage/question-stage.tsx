@@ -16,6 +16,14 @@ type Props = {
   doubleScore?: boolean;
   /** true 면 정답 ✓ 강조·오답 흐리게(결과 화면 P4, 미리보기의 '정답 보기') */
   revealCorrect?: boolean;
+  /** 진행 중 남은 초(있으면 원 안에 제한시간 대신 표시) */
+  remainingSec?: number | null;
+  /** 남은 시간 막대 비율 1 → 0 (있으면 상단에 막대 표시, P3) */
+  timeRatio?: number;
+  /** 결과 화면: 보기별 선택 인원(P4) */
+  counts?: Record<number, number>;
+  /** 상단 오른쪽 보조 표시(예: 응답 n/N) */
+  statusLabel?: string;
 };
 
 /**
@@ -33,26 +41,44 @@ export function QuestionStage({
   timeLimitSec,
   doubleScore,
   revealCorrect,
+  remainingSec,
+  timeRatio,
+  counts,
+  statusLabel,
 }: Props) {
   const hasImage = !!imageUrl && textType === "short";
   const text = questionText.trim();
+  const maxCount = counts ? Math.max(1, ...Object.values(counts)) : 1;
 
   return (
     <div className="@container w-full">
       <div className="relative flex aspect-video w-full flex-col gap-[1.6cqw] overflow-hidden rounded-[1cqw] bg-gradient-to-br from-brand-50 to-brand-100 p-[2.2cqw] text-neutral-900">
-        {/* 상단: 문제 번호 · 점수 2배 · 제한시간 */}
+        {timeRatio !== undefined && (
+          <div className="absolute inset-x-0 top-0 h-[0.8cqw] bg-white/60" aria-hidden>
+            <div
+              className={`h-full transition-[width] duration-200 ease-linear ${timeRatio < 0.25 ? "bg-red-500" : "bg-brand-500"}`}
+              style={{ width: `${timeRatio * 100}%` }}
+            />
+          </div>
+        )}
+        {/* 상단: 문제 번호 · 응답 현황 · 점수 2배 · 제한시간 */}
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-white/90 px-[1.4cqw] py-[0.4cqw] text-[1.8cqw] font-bold text-brand-700">
             {ko.stage.questionOf(questionNumber, totalQuestions)}
           </span>
           <div className="flex items-center gap-[1cqw]">
+            {statusLabel && (
+              <span className="rounded-full bg-white/90 px-[1.4cqw] py-[0.4cqw] text-[1.8cqw] font-bold text-neutral-700" aria-live="polite">
+                {statusLabel}
+              </span>
+            )}
             {doubleScore && (
               <span className="rounded-full bg-brand-600 px-[1.2cqw] py-[0.4cqw] text-[1.6cqw] font-bold text-white">
                 {ko.stage.doubleScore}
               </span>
             )}
             <span className="flex size-[6cqw] items-center justify-center rounded-full bg-white text-[2.2cqw] font-extrabold text-brand-700 shadow-sm">
-              {timeLimitSec}
+              {remainingSec ?? timeLimitSec}
             </span>
           </div>
         </div>
@@ -77,26 +103,37 @@ export function QuestionStage({
           {choices.map((choice) => {
             const style = choiceStyle(choice.id);
             const dimmed = revealCorrect && !choice.is_correct;
+            const count = counts?.[choice.id];
             return (
               <div
                 key={choice.id}
                 aria-label={ko.stage.choiceAria(choice.id)}
-                className={`flex h-[8.5cqw] items-center gap-[1.2cqw] rounded-[0.8cqw] px-[1.5cqw] text-white shadow-sm transition-opacity ${style.bg} ${
+                className={`relative flex h-[8.5cqw] items-center gap-[1.2cqw] overflow-hidden rounded-[0.8cqw] px-[1.5cqw] text-white shadow-sm transition-opacity ${style.bg} ${
                   dimmed ? "opacity-30" : ""
                 }`}
               >
-                <span className="flex shrink-0 items-center gap-[0.6cqw] text-[2.6cqw] font-extrabold">
+                {count !== undefined && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 bg-black/20 transition-[width] duration-700 ease-out motion-reduce:transition-none"
+                    style={{ width: `${(count / maxCount) * 100}%` }}
+                  />
+                )}
+                <span className="relative flex shrink-0 items-center gap-[0.6cqw] text-[2.6cqw] font-extrabold">
                   <span aria-hidden>{style.shape}</span>
                   {choice.id}
                 </span>
                 {choice.image_url ? (
                   // eslint-disable-next-line @next/next/no-img-element -- Supabase 공개 URL
-                  <img src={choice.image_url} alt="" className="h-[7cqw] rounded-[0.4cqw] bg-white object-contain" />
+                  <img src={choice.image_url} alt="" className="relative h-[7cqw] rounded-[0.4cqw] bg-white object-contain" />
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-[2.2cqw] font-bold">{choice.text}</span>
+                  <span className="relative min-w-0 flex-1 truncate text-[2.2cqw] font-bold">{choice.text}</span>
+                )}
+                {count !== undefined && (
+                  <span className="relative ml-auto shrink-0 text-[2.6cqw] font-extrabold tabular-nums">{ko.stage.peopleCount(count)}</span>
                 )}
                 {revealCorrect && choice.is_correct && (
-                  <span className="ml-auto text-[3cqw] font-extrabold" aria-label={ko.preview.showAnswer}>
+                  <span className={`relative text-[3cqw] font-extrabold ${count === undefined ? "ml-auto" : ""}`} aria-label={ko.preview.showAnswer}>
                     ✓
                   </span>
                 )}

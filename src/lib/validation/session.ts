@@ -25,6 +25,18 @@ export const joinRequestSchema = z.object({
   deviceId: z.uuid(),
 });
 
+/** 답안 제출(PRD 5.4) */
+export const answerRequestSchema = z.object({
+  questionIndex: z.number().int().min(0),
+  choiceIds: z.array(z.number().int().min(1).max(4)).min(1).max(4),
+});
+
+/** 발표 화면 '다음'(기대 위치) */
+export const advanceRequestSchema = z.object({
+  state: z.enum(["lobby", "countdown", "question", "reveal", "leaderboard", "final", "ended"]),
+  qIndex: z.number().int().min(0).nullable(),
+});
+
 /** 폰이 참가자임을 밝히는 헤더 */
 export const PARTICIPANT_ID_HEADER = "x-participant-id";
 export const PARTICIPANT_TOKEN_HEADER = "x-participant-token";

@@ -1,3 +1,4 @@
+import type { PhoneGame } from "@/lib/game/views";
 import type { PlayType, SessionState } from "@/types/db";
 
 /**
@@ -18,6 +19,8 @@ export type PlayErrorCode =
   | "nicknameTooLong"
   | "entryClosed"
   | "lateJoinClosed"
+  | "closed"
+  | "late"
   | "unauthorized"
   | "serverError";
 
@@ -33,7 +36,7 @@ export type JoinResponse =
   | { ok: true; participantId: string; nickname: string; token: string; rejoined: boolean }
   | PlayError;
 
-/** GET /api/sessions/[id]/state (헤더: x-participant-id, x-participant-token) — 4단계: 대기실 정보까지 */
+/** GET /api/sessions/[id]/state (헤더: x-participant-id, x-participant-token). game 은 정답 없는 폰용 진행 데이터 */
 export type PhoneStateResponse =
   | {
       ok: true;
@@ -47,5 +50,10 @@ export type PhoneStateResponse =
         participantCount: number;
       };
       me: { id: string; nickname: string; joinedAt: string };
+      game: PhoneGame;
     }
   | PlayError;
+
+/** POST /api/sessions/[id]/answer (헤더 동일). 응답은 '접수됨'뿐 — 정답 여부는 알려주지 않는다 */
+export type AnswerRequest = { questionIndex: number; choiceIds: number[] };
+export type AnswerResponse = { ok: true; received: true } | PlayError;

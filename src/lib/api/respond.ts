@@ -17,6 +17,8 @@ const STATUS: Record<PlayErrorCode, number> = {
   kicked: 403,
   entryClosed: 403,
   lateJoinClosed: 403,
+  closed: 409,
+  late: 409,
   notFound: 404,
   deviceUsed: 409,
   nicknameTaken: 409,

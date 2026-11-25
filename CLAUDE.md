@@ -90,17 +90,17 @@ src/
     editor/                    문제 편집기
     shows/                     My Show 목록·기본설정 모달·미리보기
     play/                      Play 설정(A5)
-    host/                      발표 화면(P1~P7)
+    host/                      발표 화면(P1~P7): host-screen.tsx(진행 제어) · host-lobby.tsx · host-views.tsx(단계별 화면)
     mobile/                    피교육자 화면 컴포넌트
   lib/
     env.ts                     공개 환경변수 읽기
     host-key.ts                진행 키 쿠키(D-27, server-only)
     api/                       폰 API 요청·응답 형식(play-api.ts), 응답 도우미
-    client/                    폰 브라우저 전용: 저장소(기기 ID·재접속 토큰), API 호출
+    client/                    브라우저 전용: 저장소(기기 ID·재접속 토큰), 폰 API 호출, 서버 시각 보정(use-server-clock.ts)
     supabase/                  client.ts(브라우저 anon: Realtime 구독·서명 URL 업로드 전용) · admin.ts(service role, server-only)
     db/                        서버 전용 DB 조회·저장 함수(server-only, admin 클라이언트 사용)
     quiz/                      문항 검증(validate.ts) 등 문제 관련 순수 로직
-    game/                      state-machine.ts · scoring.ts 등 진행 엔진 순수 로직
+    game/                      진행 엔진 순수 로직: state-machine.ts · scoring.ts · results.ts · phone-view.ts(폰용 문제, 정답 제외) · views.ts(발표 화면·폰 데이터)
     realtime/                  채널 이름·이벤트(events.ts), 서버 방송(broadcast.ts), 브라우저 신호 훅(use-session-signal.ts)
     excel/                     템플릿 생성·업로드 파싱
     report/                    리포트 집계
@@ -120,6 +120,8 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md, samples/(확인
 - 교육자 화면의 데이터 변경은 Server Action(`src/app/(host)/shows/actions.ts` 등)으로 한다. 결과는 `ActionResult`(`src/lib/action-result.ts`)로 돌려주고, 목록 화면이 바뀌는 작업만 `refresh()`를 부른다. 서버 컴포넌트에서 JSX를 `try` 안에서 만들지 않는다(lint `react-hooks/error-boundaries`).
 - 폰 API(`src/app/api/`)는 오류를 한국어가 아니라 코드(`PlayErrorCode`)로 돌려주고, 폰 화면이 `ko.play.errors`로 바꾼다. 요청·응답 타입은 `src/lib/api/play-api.ts` 한 곳에 둔다.
 - 발표 화면 Server Action(`src/app/host/[sessionId]/actions.ts`)은 모두 `hasHostAccess()`로 진행 키를 먼저 확인한다.
+- 진행 데이터는 `lib/game/views.ts`의 `buildHostView`(교육자, 정답 포함)·`buildPhoneGame`(폰, 공개된 문제까지만)으로만 만든다. 폰 점수·순위는 `revealedUpTo` 범위까지만 계산한다.
+- 답안은 반드시 DB 함수 `submit_answer`(005)로 저장한다(상태 확인과 저장을 한 트랜잭션에서).
 - 엑셀(SheetJS)은 클라이언트에서 쓸 때 `await import(...)`로 필요할 때만 불러온다(첫 화면 번들 크기).
 - 이미지는 `<img>`를 쓴다(Supabase 공개 URL, 업로드 때 이미 축소됨). `next/image` 최적화는 쓰지 않는다.
 

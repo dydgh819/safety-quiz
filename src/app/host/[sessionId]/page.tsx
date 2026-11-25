@@ -2,14 +2,18 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { HostLobby } from "@/components/host/host-lobby";
+import { HostScreen } from "@/components/host/host-screen";
 import { DbErrorNotice, Notice, supabaseSetupNotice } from "@/components/ui/setup-notice";
-import { getSession, listLobbyParticipants } from "@/lib/db/sessions";
+import { loadGameData } from "@/lib/db/game";
+import { buildHostView } from "@/lib/game/views";
 import { hasHostAccess } from "@/lib/host-key";
 import { uuidSchema } from "@/lib/validation/show";
 import { ko } from "@/messages/ko";
 
-/** P1~P7 발표 화면(프로젝터). 4단계: 대기실(P1) */
+/**
+ * P1~P7 발표 화면(프로젝터). 새로고침하거나 다른 탭에서 열어도 서버의 현재 단계로 복구된다(PL-10).
+ * 진행 키 쿠키가 있는 브라우저에서만 열린다(D-27).
+ */
 export default function HostPage({ params }: PageProps<"/host/[sessionId]">) {
   return (
     <Suspense fallback={<p className="p-8 text-neutral-500">{ko.host.loading}</p>}>
@@ -28,8 +32,8 @@ async function HostLoader({ params }: { params: PageProps<"/host/[sessionId]">["
 
   let loaded;
   try {
-    const [session, access] = await Promise.all([getSession(sessionId), hasHostAccess(sessionId)]);
-    loaded = { session, access, participants: access && session ? await listLobbyParticipants(sessionId) : [] };
+    const access = await hasHostAccess(sessionId);
+    loaded = { access, data: access ? await loadGameData(sessionId) : null };
   } catch (error) {
     console.error(error);
     return (
@@ -39,23 +43,14 @@ async function HostLoader({ params }: { params: PageProps<"/host/[sessionId]">["
     );
   }
 
-  const { session, access, participants } = loaded;
-  if (!session) notFound();
-  if (!access) {
+  if (!loaded.access) {
     return (
       <div className="p-8">
         <Notice title={ko.host.noAccessTitle} hint={ko.host.noAccessHint} />
       </div>
     );
   }
+  if (!loaded.data) notFound();
 
-  return (
-    <HostLobby
-      sessionId={session.id}
-      pin={session.pin}
-      eduTitle={session.edu_title}
-      totalQuestions={session.questions_snapshot.length}
-      initial={{ state: session.state, entryClosed: session.entry_closed, participants }}
-    />
-  );
+  return <HostScreen initial={buildHostView(loaded.data, new Date())} />;
 }

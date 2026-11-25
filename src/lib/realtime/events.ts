@@ -13,6 +13,8 @@ export type SessionEventMap = {
   participant_joined: { participantId: string };
   participant_kicked: { participantId: string };
   lobby_changed: Record<string, never>;
+  /** 진행 단계가 바뀜(PRD 5.3 state_changed·question_open·question_result·leaderboard 를 하나의 신호로) */
+  state_changed: { state: string; qIndex: number | null };
 };
 
 export type SessionEventName = keyof SessionEventMap;
