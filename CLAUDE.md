@@ -153,8 +153,10 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 
 `.env.example`에 이름만 둔다. 실제 값은 커밋하지 않는다.
 
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — 브라우저 공개 가능
-- `SUPABASE_SERVICE_ROLE_KEY` — 서버 전용(절대 규칙 4)
+- `NEXT_PUBLIC_SUPABASE_URL` — Project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — **Publishable key**(`sb_publishable_…`, 예전 이름 anon). 브라우저 공개 가능
+- `SUPABASE_SERVICE_ROLE_KEY` — **Secret key**(`sb_secret_…`, 예전 이름 service_role). 서버 전용(절대 규칙 4)
+- 사용자에게 안내할 때는 Supabase 화면의 새 이름(Publishable / Secret)으로 말한다.
 
 ## 명령어
 
