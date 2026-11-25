@@ -6,6 +6,7 @@ import {
   findFirstIncomplete,
   isQuestionComplete,
   isShowComplete,
+  isUntouchedQuestion,
   validateQuestion,
   type QuestionDraft,
 } from "./validate";
@@ -104,5 +105,24 @@ describe("Show 완성 판정", () => {
     const list = [valid(), valid({ question_text: "" }), valid({ time_limit_sec: 7 })];
     expect(findFirstIncomplete(list)).toBe(1);
     expect(isShowComplete(list)).toBe(false);
+  });
+});
+
+describe("isUntouchedQuestion", () => {
+  const blank: QuestionDraft = {
+    text_type: "short",
+    question_text: "",
+    image_url: null,
+    choices: [choice(1, ""), choice(2, ""), choice(3, ""), choice(4, "")],
+    time_limit_sec: 20,
+  };
+  it("빈 새 문항은 true", () => {
+    expect(isUntouchedQuestion(blank)).toBe(true);
+    expect(isUntouchedQuestion({ ...blank, time_limit_sec: 30 })).toBe(true);
+  });
+  it("무엇이든 입력했으면 false", () => {
+    expect(isUntouchedQuestion({ ...blank, question_text: "a" })).toBe(false);
+    expect(isUntouchedQuestion({ ...blank, choices: [choice(1, "", true), choice(2, "")] })).toBe(false);
+    expect(isUntouchedQuestion({ ...blank, memo: "메모" })).toBe(false);
   });
 });

@@ -31,10 +31,25 @@ type Props = {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onReorder: (fromId: string, toId: string) => void;
+  onExcelImport: () => void;
+  onDownloadTemplate: () => void;
+  onImportFromShow: () => void;
 };
 
 /** A4 좌측: 문제 썸네일 목록(번호·앞부분·미완성 경고), 추가·복사·삭제, 드래그 순서 변경(QZ-01) */
-export function QuestionList({ questions, selectedId, busy, onSelect, onAdd, onDuplicate, onDelete, onReorder }: Props) {
+export function QuestionList({
+  questions,
+  selectedId,
+  busy,
+  onSelect,
+  onAdd,
+  onDuplicate,
+  onDelete,
+  onReorder,
+  onExcelImport,
+  onDownloadTemplate,
+  onImportFromShow,
+}: Props) {
   const dndId = useId();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -81,6 +96,31 @@ export function QuestionList({ questions, selectedId, busy, onSelect, onAdd, onD
         >
           {ko.editor.addQuestion}
         </button>
+        <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+          <button
+            type="button"
+            onClick={onExcelImport}
+            disabled={busy}
+            className="min-h-9 rounded-md border border-neutral-300 bg-white font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {ko.importDialog.excelButton}
+          </button>
+          <button
+            type="button"
+            onClick={onDownloadTemplate}
+            className="min-h-9 rounded-md border border-neutral-300 bg-white font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            {ko.importDialog.templateButton}
+          </button>
+          <button
+            type="button"
+            onClick={onImportFromShow}
+            disabled={busy}
+            className="col-span-2 min-h-9 rounded-md border border-neutral-300 bg-white font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {ko.importDialog.fromShowButton}
+          </button>
+        </div>
       </div>
     </div>
   );

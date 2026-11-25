@@ -75,3 +75,16 @@ export function findFirstIncomplete(questions: readonly QuestionDraft[]): number
 export function isShowComplete(questions: readonly QuestionDraft[]): boolean {
   return questions.length > 0 && findFirstIncomplete(questions) === -1;
 }
+
+/**
+ * 아무것도 입력하지 않은 문항(새 Show 의 빈 1번 문항 등).
+ * 엑셀·다른 Show 에서 문제를 가져올 때, 이런 문항 하나만 있으면 지우고 가져온다.
+ */
+export function isUntouchedQuestion(q: QuestionDraft & { memo?: string }): boolean {
+  return (
+    q.question_text.trim() === "" &&
+    !q.image_url &&
+    (q.memo ?? "").trim() === "" &&
+    q.choices.every((c) => c.text.trim() === "" && !c.image_url && !c.is_correct)
+  );
+}

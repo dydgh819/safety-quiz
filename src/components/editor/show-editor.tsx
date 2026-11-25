@@ -13,6 +13,9 @@ import {
   reorderQuestionsAction,
   saveQuestionAction,
 } from "@/app/(host)/shows/actions";
+import { copyQuestionsFromShowAction, importQuestionsAction } from "@/app/(host)/shows/import-actions";
+import { ExcelImportDialog } from "@/components/editor/excel-import-dialog";
+import { ImportFromShowDialog } from "@/components/editor/import-from-show-dialog";
 import { QuestionForm, type QuestionPatch } from "@/components/editor/question-form";
 import { QuestionList } from "@/components/editor/question-list";
 import { ShowSettingsDialog } from "@/components/shows/show-settings-dialog";
@@ -20,7 +23,8 @@ import { QuestionStage } from "@/components/stage/question-stage";
 import { Modal } from "@/components/ui/modal";
 import type { ActionResult } from "@/lib/action-result";
 import type { QuestionsResult } from "@/lib/db/questions";
-import { validateQuestion } from "@/lib/quiz/validate";
+import type { ImportedQuestion } from "@/lib/excel/question-import";
+import { isUntouchedQuestion, validateQuestion } from "@/lib/quiz/validate";
 import { ko } from "@/messages/ko";
 import type { QuestionRow, ShowRow } from "@/types/db";
 
@@ -53,6 +57,7 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
   const [busy, setBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [importDialog, setImportDialog] = useState<"excel" | "show" | null>(null);
 
   // 자동 저장 상태(렌더와 무관한 값은 ref)
   const questionsRef = useRef(initialQuestions);
@@ -189,6 +194,28 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
     });
   }
 
+  /** 엑셀(QZ-10)·다른 Show(QZ-11)에서 가져온 문항을 끝에 추가하고 첫 추가 문항을 연다 */
+  function handleImportExcel(rows: ImportedQuestion[]) {
+    setImportDialog(null); // 실패 안내가 대화상자에 가리지 않도록 먼저 닫는다
+    void structural(
+      () => importQuestionsAction(show.id, rows),
+      (data) => data.newId && setSelectedId(data.newId),
+    );
+  }
+
+  function handleImportFromShow(sourceShowId: string, questionIds: string[]) {
+    setImportDialog(null); // 실패 안내가 대화상자에 가리지 않도록 먼저 닫는다
+    void structural(
+      () => copyQuestionsFromShowAction(show.id, sourceShowId, questionIds),
+      (data) => data.newId && setSelectedId(data.newId),
+    );
+  }
+
+  async function handleDownloadTemplate() {
+    const [XLSX, { buildQuestionTemplate }] = await Promise.all([import("xlsx"), import("@/lib/excel/question-template")]);
+    XLSX.writeFile(buildQuestionTemplate(), ko.excel.templateFileName);
+  }
+
   async function handleComplete() {
     setBusy(true);
     setNotice(null);
@@ -226,6 +253,7 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
   const selectedIndex = questions.findIndex((q) => q.id === selectedId);
   const selected = selectedIndex >= 0 ? questions[selectedIndex] : null;
   const selectedIssues = selected ? validateQuestion(selected) : [];
+  const replacesBlank = questions.length === 1 && isUntouchedQuestion(questions[0]);
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-[40rem] flex-col">
@@ -306,6 +334,9 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             onReorder={handleReorder}
+            onExcelImport={() => setImportDialog("excel")}
+            onDownloadTemplate={() => void handleDownloadTemplate()}
+            onImportFromShow={() => setImportDialog("show")}
           />
         </aside>
 
@@ -356,6 +387,24 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
             setShow(updated);
             setSettingsOpen(false);
           }}
+        />
+      )}
+
+      {importDialog === "excel" && (
+        <ExcelImportDialog
+          replacesBlank={replacesBlank}
+          busy={busy}
+          onClose={() => setImportDialog(null)}
+          onConfirm={handleImportExcel}
+        />
+      )}
+      {importDialog === "show" && (
+        <ImportFromShowDialog
+          currentShowId={show.id}
+          replacesBlank={replacesBlank}
+          busy={busy}
+          onClose={() => setImportDialog(null)}
+          onConfirm={handleImportFromShow}
         />
       )}
 

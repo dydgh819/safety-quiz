@@ -3,7 +3,7 @@ import "server-only";
 import { DbError } from "@/lib/db/errors";
 import { createEmptyChoices } from "@/lib/quiz/choices";
 import { DEFAULT_TIME_LIMIT_SEC } from "@/lib/quiz/constants";
-import { isShowComplete } from "@/lib/quiz/validate";
+import { isShowComplete, isUntouchedQuestion } from "@/lib/quiz/validate";
 import { getAdminClient } from "@/lib/supabase/admin";
 import type { QuestionRow } from "@/types/db";
 import type { QuestionUpdateInput } from "@/lib/validation/show";
@@ -150,6 +150,56 @@ export async function reorderQuestions(showId: string, orderedIds: readonly stri
   }
   await writeOrder(orderedIds.map((id) => byId.get(id)!));
   return syncShowCompletion(showId);
+}
+
+/** 가져올 문항 내용(엑셀·다른 Show) */
+export type QuestionContent = Pick<
+  QuestionRow,
+  "text_type" | "question_text" | "image_url" | "choices" | "memo" | "time_limit_sec" | "use_score" | "double_score"
+>;
+
+/**
+ * 문항 여러 개를 Show 끝에 추가(QZ-10, QZ-11).
+ * Show 에 아무것도 입력하지 않은 문항 1개만 있으면(새 Show) 그 문항은 지우고 추가한다.
+ */
+export async function appendQuestions(
+  showId: string,
+  contents: readonly QuestionContent[],
+): Promise<(QuestionsResult & { newId: string; replacedBlank: boolean }) | "showNotFound" | "empty"> {
+  if (contents.length === 0) return "empty";
+  const db = getAdminClient();
+  const { data: show, error: sError } = await db.from("shows").select("id").eq("id", showId).is("deleted_at", null).maybeSingle();
+  if (sError) fail(sError);
+  if (!show) return "showNotFound";
+
+  const list = await listQuestions(showId);
+  const replacedBlank = list.length === 1 && isUntouchedQuestion(list[0]);
+  if (replacedBlank) {
+    const { error } = await db.from("questions").delete().eq("id", list[0].id);
+    if (error) fail(error);
+  }
+  const start = replacedBlank ? 0 : list.length;
+
+  const { data, error } = await db
+    .from("questions")
+    .insert(contents.map((c, i) => ({ ...c, show_id: showId, order_index: start + i })))
+    .select("id, order_index");
+  if (error) fail(error);
+  const first = [...data].sort((a, b) => a.order_index - b.order_index)[0];
+
+  return { ...(await syncShowCompletion(showId)), newId: first.id, replacedBlank };
+}
+
+/** 다른 Show 의 문항 중 고른 것을 원래 순서대로 읽는다(QZ-11) */
+export async function getQuestionsByIds(sourceShowId: string, ids: readonly string[]): Promise<QuestionRow[]> {
+  const { data, error } = await getAdminClient()
+    .from("questions")
+    .select("*")
+    .eq("show_id", sourceShowId)
+    .in("id", [...ids])
+    .order("order_index", { ascending: true });
+  if (error) fail(error);
+  return data ?? [];
 }
 
 /** 문항 내용 저장(자동 저장) */

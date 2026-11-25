@@ -105,14 +105,15 @@ src/
   types/db.ts                  DB 테이블 타입
 supabase/migrations/           001_init.sql, 002_rls.sql …
 tests/e2e/                     Playwright 테스트
-scripts/                       부하 테스트 등 스크립트
-docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
+scripts/                       샘플 엑셀 생성·부하 테스트 등 스크립트(`npx tsx scripts/…`)
+docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md, samples/(확인용 샘플 파일)
 ```
 
 - 비즈니스 로직(상태 전환, 점수, 순위, 검증, 엑셀 파싱, 리포트 집계)은 `src/lib/`에 **React·Supabase에 의존하지 않는 순수 함수**로 두고 단위 테스트를 붙인다. API 라우트와 컴포넌트는 이 함수를 호출만 한다.
 - 단위 테스트는 대상 파일 옆에 `*.test.ts`, E2E는 `tests/e2e/*.spec.ts`.
 - 페이지는 기본적으로 서버 컴포넌트, 상호작용이 필요한 부분만 `'use client'`로 분리한다.
 - 교육자 화면의 데이터 변경은 Server Action(`src/app/(host)/shows/actions.ts` 등)으로 한다. 결과는 `ActionResult`(`src/lib/action-result.ts`)로 돌려주고, 목록 화면이 바뀌는 작업만 `refresh()`를 부른다. 서버 컴포넌트에서 JSX를 `try` 안에서 만들지 않는다(lint `react-hooks/error-boundaries`).
+- 엑셀(SheetJS)은 클라이언트에서 쓸 때 `await import(...)`로 필요할 때만 불러온다(첫 화면 번들 크기).
 - 이미지는 `<img>`를 쓴다(Supabase 공개 URL, 업로드 때 이미 축소됨). `next/image` 최적화는 쓰지 않는다.
 
 ## 네이밍 규칙
