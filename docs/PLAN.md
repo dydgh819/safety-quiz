@@ -104,6 +104,7 @@
   - [x] `sessions.host_key_hash`(진행 키 해시, D-27)
   - [x] rosters·roster_members 테이블은 만들어 두되 화면은 추후
 - [x] `002_rls.sql`: 모든 테이블 RLS 켜기, anon·authenticated 정책 없음(서버 service role만 접근)
+- [x] `003_service_role_grants.sql`: Supabase가 새 테이블에 service_role 권한을 자동으로 주지 않아 배포 후 `permission denied`(42501) 발생 → 권한 명시(2026-11-25 추가)
 - [x] DB 접근 계층: 서버 전용 데이터 함수(`src/lib/db/` 등)로 모아 서버 컴포넌트·Server Action·API에서 사용
 - [ ] ~~로그인·회원가입(A1, SH-01), 라우트 보호~~ (삭제, D-26)
 - [x] 교육자 공통 레이아웃: 상단 내비(My Show, 리포트)
@@ -137,7 +138,7 @@
 - [ ] (P0) QZ-08 자동 저장(1초 디바운스, '저장 중/저장됨'), 미완성 문항 경고
 - [ ] (P0) QZ-08 미완성 판정 `src/lib/quiz/validate.ts` 한 곳 + 단위 테스트
 - [ ] (P0) QZ-09 '완성' 버튼: 미완성 문항으로 이동·안내 / 완성 시 `is_complete=true` + 완성 모달, 수정 시 재계산
-- [ ] 이미지 업로드: Storage `quiz-media`(공개, UUID 파일명), 브라우저에서 1600px·WebP 축소, 5MB 제한. 업로드는 서버가 발급한 서명 업로드 URL로(브라우저 anon에 쓰기 권한 없음), `003_storage.sql`
+- [ ] 이미지 업로드: Storage `quiz-media`(공개, UUID 파일명), 브라우저에서 1600px·WebP 축소, 5MB 제한. 업로드는 서버가 발급한 서명 업로드 URL로(브라우저 anon에 쓰기 권한 없음), `004_storage.sql`
 
 **완료 조건**: Show 생성 → 문제 5개 입력·정렬·완성 가능, `validate.ts` 테스트 통과.
 

@@ -3,7 +3,7 @@ import { connection } from "next/server";
 
 import { classifyDbError, toDbErrorInfo } from "@/lib/db/errors";
 import { listShows } from "@/lib/db/shows";
-import { listMissingSupabaseEnv } from "@/lib/supabase/admin";
+import { detectWrongServerKey, listMissingSupabaseEnv } from "@/lib/supabase/admin";
 import { ko } from "@/messages/ko";
 
 /** A2 My Show — 1단계는 목록 조회와 빈 상태만. 카드·만들기·메뉴는 2단계. */
@@ -41,6 +41,10 @@ async function ShowList() {
         hint={ko.errors.supabaseNotConfiguredHint(missingEnv)}
       />
     );
+  }
+
+  if (detectWrongServerKey()) {
+    return <Notice title={ko.errors.supabaseNotConfigured} hint={ko.errors.wrongServerKey} />;
   }
 
   let shows;

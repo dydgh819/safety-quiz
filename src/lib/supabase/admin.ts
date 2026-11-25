@@ -39,6 +39,26 @@ export function listMissingSupabaseEnv(): string[] {
   return missing;
 }
 
+/**
+ * SUPABASE_SERVICE_ROLE_KEY 자리에 브라우저용 키가 들어갔는지 검사(화면 안내용). 키 값은 돌려주지 않는다.
+ * - 'publishable': 새 Publishable key(sb_publishable_…)를 넣음
+ * - 'anon': 예전 anon JWT 를 넣음
+ */
+export function detectWrongServerKey(): "publishable" | "anon" | null {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
+  if (key.startsWith("sb_publishable_")) return "publishable";
+  const parts = key.split(".");
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { role?: unknown };
+      if (payload.role === "anon") return "anon";
+    } catch {
+      // JWT 가 아니면 판단하지 않음
+    }
+  }
+  return null;
+}
+
 /** 환경변수가 모두 있는지 확인(화면 안내용). */
 export function isSupabaseConfigured(): boolean {
   return listMissingSupabaseEnv().length === 0;

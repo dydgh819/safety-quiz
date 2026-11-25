@@ -61,6 +61,7 @@
    - `NEXT_PUBLIC_` 접두사를 붙이지 않는다. 클라이언트 컴포넌트(`'use client'`)에서 admin 클라이언트를 import 하지 않는다.
 5. **모든 테이블에 RLS를 켠다.**
    - 새 테이블을 만드는 마이그레이션에는 반드시 `enable row level security`와 정책을 함께 넣는다.
+   - Supabase가 새 테이블에 권한을 자동으로 주지 않을 수 있으므로, 새 테이블에는 `grant select, insert, update, delete ... to service_role`을 명시한다(003에서 기본 권한도 설정함).
    - `anon`·`authenticated`용 정책은 만들지 않는다(= 브라우저에서 anon 키로는 아무 테이블도 읽고 쓰지 못함). 접근은 서버의 service role로만 한다.
 
 6. **실시간 방송은 신호로만 쓴다.** Supabase 공개 채널은 누구나 메시지를 보낼 수 있으므로, 방송을 받으면 상태·정답·순위는 API로 다시 받아 화면을 맞춘다(D-19).
@@ -143,11 +144,12 @@ docs/                          PRD.md, PLAN.md, KNOWN_ISSUES.md
 
 ## DB 변경 (마이그레이션)
 
-- 모든 DB 변경은 `supabase/migrations/번호_설명.sql` 파일로 만든다. 번호는 3자리 순번: `001_init.sql`, `002_rls.sql`, `003_storage.sql` …
+- 모든 DB 변경은 `supabase/migrations/번호_설명.sql` 파일로 만든다. 번호는 3자리 순번: `001_init.sql`, `002_rls.sql`, `003_service_role_grants.sql` …
 - **SQL은 사용자가 Supabase SQL Editor에서 직접 실행한다.** Claude는 DB에 직접 접속하거나 마이그레이션을 실행하지 않는다.
 - 한 번 안내한(실행됐을 수 있는) 마이그레이션 파일은 고치지 않는다. 변경이 필요하면 새 번호 파일을 만든다.
 - 가능한 범위에서 다시 실행해도 안전하게 쓴다(`if not exists`, `create or replace`, `drop policy if exists` 등).
 - 마이그레이션을 추가하면 `src/types/db.ts`도 함께 갱신하고, 단계 보고에 **실행할 파일과 순서**를 적는다.
+- 실행 안내에는 GitHub 파일 링크를 함께 주고, **경로가 아니라 파일 내용 전체를 SQL Editor에 붙여넣어 실행**한다고 적는다.
 
 ## 환경변수
 

@@ -35,12 +35,14 @@ export const ko = {
     supabaseNotConfigured: "Supabase 연결 정보가 설정되지 않았습니다.",
     supabaseNotConfiguredHint: (missing: readonly string[]) =>
       `이 배포에 비어 있는 환경변수: ${missing.join(", ")} — Vercel에 등록(Preview 환경 포함)한 뒤 다시 배포(Redeploy)해 주세요.`,
+    wrongServerKey:
+      "SUPABASE_SERVICE_ROLE_KEY에 브라우저용 키(Publishable key 또는 anon key)가 들어 있습니다. Supabase → API Keys의 Secret key(sb_secret_…)로 바꾼 뒤 다시 배포해 주세요.",
     loadFailed: "데이터를 불러오지 못했습니다.",
     dbErrorHint: {
       tablesMissing:
         "DB에 테이블이 없습니다. Supabase SQL Editor에서 001_init.sql, 002_rls.sql 내용을 순서대로 실행해 주세요.",
       permissionDenied:
-        "테이블 접근 권한이 없습니다. SUPABASE_SERVICE_ROLE_KEY에 Publishable key가 아니라 Secret key(sb_secret_…)를 넣었는지 확인해 주세요.",
+        "서버 키(Secret key)에 테이블 권한이 없습니다. Supabase SQL Editor에서 003_service_role_grants.sql 내용을 실행해 주세요.",
       invalidKey:
         "Supabase 키가 올바르지 않습니다. 키를 다시 복사해 등록하고(앞뒤 공백 없이), URL과 같은 프로젝트의 키인지 확인해 주세요.",
       unreachable:
