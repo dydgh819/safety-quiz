@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DbError } from "@/lib/db/errors";
 import { getAdminClient } from "@/lib/supabase/admin";
 import type { ShowRow } from "@/types/db";
 
@@ -19,7 +20,7 @@ export async function listShows(): Promise<ShowListItem[]> {
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
 
-  if (error) throw new Error(`listShows: ${error.message}`);
+  if (error) throw new DbError({ code: error.code ?? "", message: error.message });
 
   return (data ?? []).map((row) => {
     const counts = row.questions as { count: number }[] | null;

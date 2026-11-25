@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 
+import { classifyDbError, toDbErrorInfo } from "@/lib/db/errors";
 import { listShows } from "@/lib/db/shows";
 import { listMissingSupabaseEnv } from "@/lib/supabase/admin";
 import { ko } from "@/messages/ko";
@@ -47,7 +48,14 @@ async function ShowList() {
     shows = await listShows();
   } catch (error) {
     console.error(error);
-    return <Notice title={ko.errors.loadFailed} hint={ko.errors.loadFailedHint} />;
+    const info = toDbErrorInfo(error);
+    return (
+      <Notice
+        title={ko.errors.loadFailed}
+        hint={ko.errors.dbErrorHint[classifyDbError(info)]}
+        detail={ko.errors.dbErrorDetail(info.code, info.message)}
+      />
+    );
   }
 
   if (shows.length === 0) {
@@ -82,11 +90,12 @@ async function ShowList() {
   );
 }
 
-function Notice({ title, hint }: { title: string; hint: string }) {
+function Notice({ title, hint, detail }: { title: string; hint: string; detail?: string }) {
   return (
     <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-6 py-5">
       <p className="font-semibold text-red-700">{title}</p>
       <p className="mt-1 text-sm text-red-600">{hint}</p>
+      {detail && <p className="mt-2 font-mono text-xs break-all text-red-500">{detail}</p>}
     </div>
   );
 }
