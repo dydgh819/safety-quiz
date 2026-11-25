@@ -25,3 +25,8 @@ export function trashDaysLeft(deletedAtIso: string, now: Date = new Date()): num
   const leftMs = TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000 - elapsedMs;
   return Math.max(0, Math.ceil(leftMs / (24 * 60 * 60 * 1000)));
 }
+
+/** 한국 날짜 YYYY-MM-DD (교육일 기본값) */
+export function todayInSeoul(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}

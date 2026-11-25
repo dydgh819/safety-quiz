@@ -187,8 +187,9 @@ function ActiveCard({ show, onCopy, onTrash }: { show: ShowListItem; onCopy: () 
           items={[
             {
               label: ko.shows.menuPlay,
-              disabled: true,
-              title: show.is_complete ? ko.common.comingSoon(4) : ko.shows.playNeedsComplete,
+              href: `/shows/${show.id}/play`,
+              disabled: !show.is_complete,
+              title: show.is_complete ? undefined : ko.shows.playNeedsComplete,
             },
             { label: ko.shows.menuEdit, href: `/shows/${show.id}/edit` },
             { label: ko.shows.menuCopy, onSelect: onCopy },

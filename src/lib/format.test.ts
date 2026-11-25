@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime, trashDaysLeft } from "./format";
+import { formatDateTime, todayInSeoul, trashDaysLeft } from "./format";
 
 describe("formatDateTime", () => {
   it("한국 시간으로 표시한다", () => {
@@ -19,5 +19,12 @@ describe("trashDaysLeft", () => {
   });
   it("30일 넘으면 0", () => {
     expect(trashDaysLeft("2026-10-01T00:00:00Z", now)).toBe(0);
+  });
+});
+
+describe("todayInSeoul", () => {
+  it("UTC 15시 이후는 한국 다음 날", () => {
+    expect(todayInSeoul(new Date("2026-11-24T14:59:00Z"))).toBe("2026-11-24");
+    expect(todayInSeoul(new Date("2026-11-24T15:00:00Z"))).toBe("2026-11-25");
   });
 });

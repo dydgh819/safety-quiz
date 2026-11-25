@@ -423,9 +423,8 @@ export function ShowEditor({ initialShow, initialQuestions }: { initialShow: Sho
               </button>
               <button
                 type="button"
-                disabled
-                title={ko.common.comingSoon(4)}
-                className="min-h-11 rounded-lg border border-neutral-300 px-4 font-medium text-neutral-400"
+                onClick={() => router.push(`/shows/${show.id}/play`)}
+                className="min-h-11 rounded-lg border border-neutral-300 px-4 font-medium hover:bg-neutral-50"
               >
                 {ko.editor.playNow}
               </button>
